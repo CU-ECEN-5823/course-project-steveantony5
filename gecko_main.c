@@ -39,6 +39,7 @@
 #include "src/log.h"
 #include "src/display.h"
 #include "src/gpio.h"
+#include "src/letimer.h"
 #include "mesh_generic_model_capi_types.h"
 
 /* Device initialization header */
@@ -54,14 +55,15 @@
 extern int8_t FLAG_PERIODIC_1;
 extern int32_t FREQUENCY_OSC;
 
-#define TIMER_ID_RESTART        78
-#define TIMER_ID_FACTORY_RESET  77
-#define TIMER_ID_RETRANS        10
+/**********************************************
+ *                MACROS
+ * ********************************************/
+#define TIMER_ID_RESTART        (78)
+#define ONE_SHOT                (1)
 
-// Convert miliseconds to timer ticks
-#define TIMER_MS_2_TIMERTICK(ms) ((FREQUENCY_OSC * ms) / 1000)
-
-int init_done = 0;
+/**********************************************
+ *                GLOBALS
+ * ********************************************/
 int local_button_press = 0;
 
 uint8 request_count;
@@ -73,7 +75,6 @@ uint8 trid = 0;
 /// current position of the button
 extern button_flag  button_position ;
 
-void handle_button_press( );
 
 /***********************************************************************************************//**
  * @addtogroup Application
@@ -223,22 +224,34 @@ void gecko_main_init()
   gecko_initCoexHAL();
 
 }
-
+/******************************************************
+ * Func name:   set_device_name
+ * Description: Gets the address of the node in the mesh
+ * parameter : bluetooth address
+ * ***************************************************/
 static void set_device_name(bd_addr *pAddr)
 {
   char name[20];
   uint16 res;
 
+#if DEVICE_IS_ONOFF_PUBLISHER
   // create unique device name using the last two bytes of the Bluetooth address
-  sprintf(name, "node %02x:%02x", pAddr->addr[1], pAddr->addr[0]);
+  sprintf(name, "23P:02x%02x", pAddr->addr[1], pAddr->addr[0]);
 
-  LOG_INFO("Device name: '%s'\r\n", name);
+#else
+  // create unique device name using the last two bytes of the Bluetooth address
+  sprintf(name, "23S:02x%02x", pAddr->addr[1], pAddr->addr[0]);
+
+#endif
+  LOG_INFO("Device name: '%s'\n", name);
+  displayPrintf(DISPLAY_ROW_CLIENTADDR,"Node: %s",name);
+
 
   // write device name to the GATT database
   res = gecko_cmd_gatt_server_write_attribute_value(gattdb_device_name, 0, strlen(name), (uint8 *)name)->result;
   if (res)
   {
-	  LOG_INFO("gecko_cmd_gatt_server_write_attribute_value() failed, code %x\r\n", res);
+	  LOG_INFO("gecko_cmd_gatt_server_write_attribute_value() failed, code %x\n", res);
   }
 }
 
@@ -247,17 +260,18 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
 	switch (evt_id)
 	{
     	case gecko_evt_system_boot_id:
-    		// Initialize Mesh stack in Node operation mode, wait for initialized event
+    		/*Initialize Mesh stack in Node operation mode, wait for initialized event*/
     		LOG_INFO("Entered boot id\n");
 
+    		/*Factory reset*/
     		if (GPIO_PinInGet(BSP_BUTTON0_PORT, BSP_BUTTON0_PIN) == 0 || GPIO_PinInGet(BSP_BUTTON1_PORT, BSP_BUTTON1_PIN) == 0)
     		{
     			LOG_INFO("factory reset\n");
-    			displayPrintf(DISPLAY_ROW_CONNECTION, "Factory reset");
+    			displayPrintf(DISPLAY_ROW_ACTION, "Factory reset");
     			gecko_cmd_flash_ps_erase_all();
 
-    			//trigger delay for 2secs and do a reboot
-    			gecko_cmd_hardware_set_soft_timer(32768*2, TIMER_ID_RESTART, 1);
+    			/*trigger delay for 2secs and do a reboot*/
+    			gecko_cmd_hardware_set_soft_timer(2 * 32768, TIMER_ID_RESTART, ONE_SHOT);
 
     		}
 
@@ -266,6 +280,10 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 
     			struct gecko_msg_system_get_bt_address_rsp_t *pAddr = gecko_cmd_system_get_bt_address();
+
+    			displayPrintf(DISPLAY_ROW_BTADDR,"BT: %x:%x:%x:%x:%x:%x",pAddr->address.addr[5],\
+    					pAddr->address.addr[4],pAddr->address.addr[3],pAddr->address.addr[2],\
+						pAddr->address.addr[1], pAddr->address.addr[0]);
 
     			set_device_name(&pAddr->address);
 
@@ -276,6 +294,9 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
     		break;
 
+    	case gecko_evt_le_connection_opened_id:
+    		displayPrintf(DISPLAY_ROW_CONNECTION, "CONNECTED");
+
     	case gecko_evt_mesh_node_initialized_id:
     		LOG_INFO("entered gecko_evt_mesh_node_initialized_id\n");
     		if (!evt->data.evt_mesh_node_initialized.provisioned)
@@ -283,15 +304,14 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     			// The Node is now initialized, start unprovisioned Beaconing using PB-ADV and PB-GATT Bearers
     			gecko_cmd_mesh_node_start_unprov_beaconing(0x3);
     			LOG_INFO("Node unprovisioned id\n");
-        		displayPrintf(DISPLAY_ROW_CONNECTION, "Node UnProvisioned");
+        		displayPrintf(DISPLAY_ROW_ACTION, "Node UnProvisioned");
 
     		}
 
     		//enters if node is provisioned
     		if(evt->data.evt_mesh_node_initialized.provisioned )
     		{
-    			init_done = 1;
-    			displayPrintf(DISPLAY_ROW_CONNECTION, "Node Provisioned");
+    			displayPrintf(DISPLAY_ROW_ACTION, "Node Provisioned");
 
     			if(DeviceUsesClientModel())
     			{
@@ -304,13 +324,13 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     		if((evt->data.evt_mesh_node_initialized.provisioned) && (DeviceUsesClientModel()))
     		{
     			displayPrintf(DISPLAY_ROW_NAME, "Publisher");
-    			LOG_INFO("client init\n");
+    			LOG_INFO("client init success\n");
     			uint16_t error = gecko_cmd_mesh_generic_client_init()->result;
 
     			if(error)
     			{
-    				LOG_INFO("Client Init Failed\n\r");
-    				LOG_INFO("Error code: %x\n\r", error);
+    				LOG_INFO("Client Init Failed\n");
+    				LOG_INFO("Error code: %x\n", error);
     	       }
     		}
 
@@ -319,13 +339,13 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     		{
     			displayPrintf(DISPLAY_ROW_NAME, "Subscriber");
 
-    			LOG_INFO("server init\n");
+    			LOG_INFO("Server init success\n");
 
     			uint16_t error = gecko_cmd_mesh_generic_server_init()->result;
     			if(error)
     	       {
-    				LOG_INFO("Server Init Failed\n\r");
-    				LOG_INFO("Error code: %x\n\r", error);
+    				LOG_INFO("Server Init Failed\n");
+    				LOG_INFO("Error code: %x\n", error);
     	       }
     		}
     		if(evt->data.evt_mesh_node_initialized.provisioned && DeviceIsOnOffPublisher())
@@ -333,8 +353,8 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     			int error = mesh_lib_init(malloc,free,8);
     			if(error)
     			{
-    				LOG_INFO("mesh_lib_init publisher Init Failed\n\r");
-    				LOG_INFO("Error code: %x\n\r", error);
+    				LOG_INFO("mesh_lib_init publisher Init Failed\n");
+    				LOG_INFO("Error code: %x\n", error);
     			}
     		}
 
@@ -344,7 +364,7 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     			if(error)
     			{
     				printf("mesh_lib_init subs Init Failed\n\r");
-    			    printf("Error code: %x\n\r", error);
+    			    printf("Error code: %x\n", error);
 
     			}
 
@@ -387,32 +407,32 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
     	case gecko_evt_mesh_node_provisioning_started_id:
     		LOG_INFO("Started provisioning\r\n");
-    		displayPrintf(DISPLAY_ROW_ACTION, "Started Provisioning");
-
+    		displayPrintf(DISPLAY_ROW_ACTION, "Provisioning");
 
     		break;
 
     	case gecko_evt_mesh_node_provisioning_failed_id:
     		LOG_INFO("provisioning failed, code %x\r\n", evt->data.evt_mesh_node_provisioning_failed.result);
-    		displayPrintf(DISPLAY_ROW_CONNECTION, "Provisioning failed");
+    		displayPrintf(DISPLAY_ROW_ACTION, "Provisioning failed");
 
-    		/* start a one-shot timer that will trigger soft reset after small delay */
-    		gecko_cmd_hardware_set_soft_timer(2 * 32768, TIMER_ID_RESTART, 1);
+    		/* start a one-shot timer that will trigger soft reset after with a delay of 2 secs */
+    		gecko_cmd_hardware_set_soft_timer(2 * 32768, TIMER_ID_RESTART, ONE_SHOT);
 
     		break;
 
     	case gecko_evt_mesh_node_provisioned_id:
     		LOG_INFO("node provisioned, address=%x\r\n", evt->data.evt_mesh_node_provisioned.address);
-    		displayPrintf(DISPLAY_ROW_CONNECTION, "Node Provisioned");
+    		displayPrintf(DISPLAY_ROW_ACTION, "Provisioned");
 
-    		//do a reboot after provisioning the node
-    		gecko_cmd_hardware_set_soft_timer(32768*2, TIMER_ID_RESTART, 1);
+    		/*do a reboot after provisioning the node with a delay of 2 secs */
+    		gecko_cmd_hardware_set_soft_timer(2 * 32768, TIMER_ID_RESTART, ONE_SHOT);
 
     		break;
 
-    		// enters this event if the anything is published
+    		/*enters this event if the anything is published*/
     	case gecko_evt_mesh_generic_server_client_request_id:
-    		LOG_INFO("evt gecko_evt_mesh_generic_server_client_request_id : button state received\r\n");
+    		LOG_INFO("evt gecko_evt_mesh_generic_server_client_request_id : button state received\n");
+
     	    uint8_t press = 0;
     	    press = evt->data.evt_mesh_generic_server_client_request.parameters.data[0];
     	    LOG_INFO("Button state %d\n",press);
@@ -430,7 +450,7 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
     		break;
 
     	case gecko_evt_mesh_generic_server_state_changed_id:
-    	    LOG_INFO("evt gecko_evt_mesh_generic_server_state_changed_id\r\n");
+    	    LOG_INFO("evt gecko_evt_mesh_generic_server_state_changed_id\n");
     	    if(DeviceUsesServerModel())
     	    	mesh_lib_generic_server_event_handler(evt);
 
@@ -446,16 +466,24 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
     	      }
 
+    	 //Factory reset when requested by provisioner
+    	case gecko_evt_mesh_node_reset_id:
+
+    		gecko_cmd_flash_ps_erase_all();
+    		//do a reboot after provisioning the node
+    		gecko_cmd_hardware_set_soft_timer(32768*2, TIMER_ID_RESTART, ONE_SHOT);
+    		break;
+
     	case gecko_evt_system_external_signal_id:
 
     		//checks if the event triggered due to change 1 sec interrupt
-    		if((evt->data.evt_system_external_signal.extsignals) & (FLAG_PERIODIC_1 == 1))
+    		if((evt->data.evt_system_external_signal.extsignals) & (FLAG_PERIODIC_1 == TRUE))
     		{
     			CORE_DECLARE_IRQ_STATE;
 
     			CORE_ENTER_CRITICAL();
 
-    			FLAG_PERIODIC_1 = 0;
+    			FLAG_PERIODIC_1 = FALSE;
 
     			CORE_EXIT_CRITICAL();
 
@@ -495,22 +523,20 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
  * ***************************************************/
 void generic_level_update_publish(bool data)
 {
-	struct mesh_generic_state custom_data;
-
-	custom_data.kind = mesh_generic_state_on_off;
-	custom_data.on_off.on = data;
-
+	//increment the transmission id
 	trid +=1;
-	struct mesh_generic_request custom;
-	custom.kind = mesh_generic_request_on_off;
-	custom.on_off = data;
-	int resp = mesh_lib_generic_client_publish(MESH_GENERIC_ON_OFF_CLIENT_MODEL_ID,_my_index,trid,&custom, false,false,false);
+
+	struct mesh_generic_request publish_data;
+	publish_data.kind = mesh_generic_request_on_off;
+	publish_data.on_off = data;
+
+	//publishing the button service
+	int resp = mesh_lib_generic_client_publish(MESH_GENERIC_ON_OFF_CLIENT_MODEL_ID,_my_index,trid,&publish_data, false,false,false);
 
 	if(resp)
 		LOG_INFO("publish error %x\n",resp);
 	else
 		LOG_INFO("Client publish successful\n");
-
 
 }
 
