@@ -9,6 +9,8 @@
 #include "log.h"
 #include <stdbool.h>
 
+extern int32_t counter;
+
 #if INCLUDE_LOGGING
 /**
  * @return a timestamp value for the logger, typically based on a free running timer.
@@ -16,8 +18,7 @@
  */
 uint32_t loggerGetTimestamp(void)
 {
-	//return timerGetRunTimeMilliseconds();
-	return 0;
+	return counter;
 }
 
 /**
