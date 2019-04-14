@@ -24,6 +24,12 @@ void button_init(void)
   GPIO_PinModeSet(PB0_port, PB1_pin, gpioModeInput, 0);
 }
 
+void touch_sensor_init(void)
+{
+	GPIO_PinModeSet(Touch_sensor_1_port, Touch_1_pin, gpioModeInput, 0);
+	GPIO_PinModeSet(Touch_sensor_2_port, Touch_2_pin, gpioModeInput, 0);
+}
+
 /*****************************************************************
  * Function name: gpioLed1SetOn
  * Parameters : None
@@ -74,20 +80,18 @@ void gpioEnableDisplay()
 
 
 
-void enable_PB0_interrupt()
+void enable_touch_interrupt()
 {
-	//clearing the previous interrupts
-	NVIC_ClearPendingIRQ(GPIO_EVEN_IRQn);
-
-	//enabling PB0 interrupts
-	NVIC_EnableIRQ(GPIO_EVEN_IRQn);
+	GPIOINT_Init();
 
 	/*setting Rising edge and Falling edge interrupt
 	 * Rising as well as Falling edge interrupt is activated because
 	 * the change of state from 1 to 0 as well as 0 to 1 has to be notified
 	 */
 
-	GPIO_IntConfig(PB0_port, PB0_pin, RISING_EDGE, FALLING_EDGE, true);
+	GPIO_IntConfig(Touch_sensor_1_port, Touch_1_pin, RISING_EDGE, false, true);
+	GPIO_IntConfig(Touch_sensor_2_port, Touch_2_pin, RISING_EDGE, false, true);
+
 }
 
 /*****************************************************************
@@ -106,15 +110,12 @@ void GPIO_EVEN_IRQHandler()
 	int Status_register = GPIO_IntGet();
 
 	//reads the state of PB0 pin whether it is 0 or 1
-	int button_press =  !(GPIO_PinInGet(PB0_port, PB0_pin));
+	int touch_1 =  !(GPIO_PinInGet(Touch_sensor_1_port, Touch_1_pin));
 
-	LOG_INFO("Event occurred PB0 %d\n",button_press);
+	LOG_INFO("Event occurred touch 1 %d\n",touch_1);
 
-	if (button_press == 0)
-		button_position = 2; //2  - 0b10
-	else
-		button_position = 4; //4 - 0b100
-
+	if (touch_1 == 0)
+		touch_1_status = 2; //2  - 0b10
 
 
 	//clearing the interrupt status register
@@ -124,7 +125,35 @@ void GPIO_EVEN_IRQHandler()
 	CORE_ATOMIC_IRQ_ENABLE();
 
 	//signaling the state machine that a change has occurred
-	gecko_external_signal(button_position);
+	gecko_external_signal(touch_1_status);
 
+
+}
+
+void GPIO_ODD_IRQHandler()
+{
+	//disabling interrupts
+	CORE_ATOMIC_IRQ_DISABLE();
+
+	//gets the status of the interrupt
+	int Status_register = GPIO_IntGet();
+
+	//reads the state of PB0 pin whether it is 0 or 1
+	int touch_2 =  !(GPIO_PinInGet(Touch_sensor_2_port, Touch_2_pin));
+
+	LOG_INFO("Event occurred touch 2 %d\n",touch_2);
+
+	if (touch_2 == 0)
+		touch_2_status = 2; //2  - 0b10
+
+
+	//clearing the interrupt status register
+	GPIO_IntClear(Status_register);
+
+	//enabling interrupts
+	CORE_ATOMIC_IRQ_ENABLE();
+
+	//signaling the state machine that a change has occurred
+	gecko_external_signal(touch_2_status);
 
 }

@@ -26,11 +26,10 @@ sleepEM3 = 3,
 sleepEM4 = 4 */
 
 const int sleep_mode_select = sleepEM0;
-
-
 /*****************************************************************
  *
  */
+
 extern void gecko_main_init();
 bool mesh_bgapi_listener(struct gecko_cmd_packet *evt);
 extern void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt);
@@ -40,8 +39,6 @@ int8_t FLAG_PERIODIC_1;
 
 int8_t FLAG_Delay_80;
 int8_t FLAG_DONE;
-
-
 
 
 
@@ -63,6 +60,9 @@ int main(void)
 
   button_init();
 
+  touch_sensor_init();
+  enable_touch_interrupt();
+
   displayInit();
 
   logInit();
@@ -78,3 +78,4 @@ int main(void)
 	}
   };
 }
+
