@@ -32,16 +32,37 @@ const uint8_t __mesh_dcd[] = {
     0x0f, 0x00, /* Features Bitmask = 0x000f */
     /* Begin Primary Element */
         0x00, 0x00, /* Location = 0x0000 */
-        0x03, /* Number of SIG Models = 0x03 */
+        0x0d, /* Number of SIG Models = 0x0d */
         0x00, /* Number of Vendor Models = 0x00 */
         /* Begin SIG Models */
         0x00, 0x00, /* Configuration Server */
         0x01, 0x10, /* Generic OnOff Client */
         0x00, 0x10, /* Generic OnOff Server */
+        0x03, 0x13, /* Light CTL Server */
+        0x04, 0x13, /* Light CTL Setup Server */
+        0x04, 0x10, /* Generic Default Transition Time Server */
+        0x07, 0x10, /* Generic Power OnOff Setup Server */
+        0x02, 0x10, /* Generic Level Server */
+        0x01, 0x13, /* Light Lightness Setup Server */
+        0x00, 0x13, /* Light Lightness Server */
+        0x02, 0x00, /* Health Server */
+        0x06, 0x10, /* Generic Power OnOff Server */
+        0x03, 0x10, /* Generic Level Client */
         /* End SIG Models */
         /* Begin Vendor Models */
         /* End Vendor Models */
     /* End Primary Element */
+    /* Begin Secondary Element */
+        0x00, 0x00, /* Location = 0x0000 */
+        0x02, /* Number of SIG Models = 0x02 */
+        0x00, /* Number of Vendor Models = 0x00 */
+        /* Begin SIG Models */
+        0x02, 0x10, /* Generic Level Server */
+        0x06, 0x13, /* Light CTL Temperature Server */
+        /* End SIG Models */
+        /* Begin Vendor Models */
+        /* End Vendor Models */
+    /* End Secondary Element */
 };
 
 const size_t __mesh_dcd_len = sizeof(__mesh_dcd);

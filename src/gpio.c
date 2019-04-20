@@ -4,11 +4,23 @@
  *  Created on: Dec 12, 2018
  *      Author: Dan Walkes
  */
+
+/**********************************
+ *    Include
+ ***********************************/
 #include "gpio.h"
-#include "em_gpio.h"
-#include <string.h>
+
+/**********************************
+ *    Global
+ ***********************************/
+int32_t FLAG_STOP_LOCAL_BUFFER = 0;
 
 
+/******************************************************
+ * Func name:   gpioInit
+ * Description: function initiate led pins
+ * parameter : none
+ * ***************************************************/
 void gpioInit()
 {
 	GPIO_DriveStrengthSet(LED1_port, gpioDriveStrengthStrongAlternateStrong);
@@ -17,6 +29,11 @@ void gpioInit()
 
 }
 
+/******************************************************
+ * Func name:   button_init
+ * Description: function initiate buttons PB1 and PB0
+ * parameter : none
+ * ***************************************************/
 void button_init(void)
 {
   // configure pushbutton PB0 and PB1 as inputs, with pull-up enabled
@@ -24,6 +41,11 @@ void button_init(void)
   GPIO_PinModeSet(PB0_port, PB1_pin, gpioModeInput, 0);
 }
 
+/******************************************************
+ * Func name:   touch_sensor_init
+ * Description: function initiate touch sensors
+ * parameter : none
+ * ***************************************************/
 void touch_sensor_init(void)
 {
 	GPIO_PinModeSet(Touch_sensor_1_port, Touch_1_pin, gpioModeInput, 0);
@@ -78,27 +100,36 @@ void gpioEnableDisplay()
 }
 
 
-
+/******************************************************
+ * Func name:   enable_touch_interrupt
+ * Description: function enable touch sensors interrupts
+ * parameter : none
+ * ***************************************************/
 
 void enable_touch_interrupt()
 {
+	//enables the odd and even interrupts
 	GPIOINT_Init();
-
-	/*setting Rising edge and Falling edge interrupt
-	 * Rising as well as Falling edge interrupt is activated because
-	 * the change of state from 1 to 0 as well as 0 to 1 has to be notified
-	 */
 
 	GPIO_IntConfig(Touch_sensor_1_port, Touch_1_pin, RISING_EDGE, false, true);
 	GPIO_IntConfig(Touch_sensor_2_port, Touch_2_pin, RISING_EDGE, false, true);
 
 }
 
+/******************************************************
+ * Func name:   enable_PB1_interrupt
+ * Description: function to enable PB1 button interrupt
+ * parameter : none
+ * ***************************************************/
+void enable_PB1_interrupt()
+{
+	GPIO_IntConfig(PB0_port, PB1_pin, RISING_EDGE, false, true);
+}
 /*****************************************************************
  * Function name: GPIO_EVEN_IRQHandler
  * Parameters : None
  *
- * Interrupt handler for PB0 button press
+ * Interrupt handler for even pins
  *****************************************************************/
 
 void GPIO_EVEN_IRQHandler()
@@ -130,6 +161,13 @@ void GPIO_EVEN_IRQHandler()
 
 }
 
+
+/*****************************************************************
+ * Function name: GPIO_ODD_IRQHandler
+ * Parameters : None
+ *
+ * Interrupt handler for odd pins
+ *****************************************************************/
 void GPIO_ODD_IRQHandler()
 {
 	//disabling interrupts
@@ -138,22 +176,79 @@ void GPIO_ODD_IRQHandler()
 	//gets the status of the interrupt
 	int Status_register = GPIO_IntGet();
 
-	//reads the state of PB0 pin whether it is 0 or 1
-	int touch_2 =  !(GPIO_PinInGet(Touch_sensor_2_port, Touch_2_pin));
+	LOG_INFO("Status_register %d\n",Status_register);
 
-	LOG_INFO("Event occurred touch 2 %d\n",touch_2);
+	//for touch sensor
+	if(Status_register == TOUCH_2_interrupt)
+	{
 
-	if (touch_2 == 0)
-		touch_2_status = 2; //2  - 0b10
+		//reads the state of PB0 pin whether it is 0 or 1
+		int touch_2 =  !(GPIO_PinInGet(Touch_sensor_2_port, Touch_2_pin));
+
+		LOG_INFO("Event occurred touch 2 %d\n",touch_2);
+
+		if (touch_2 == 0)
+			touch_2_status = 2; //2  - 0b10
 
 
-	//clearing the interrupt status register
+
+
+		//signaling the state machine that a change has occurred
+		gecko_external_signal(touch_2_status);
+	}
+
+	//for PB1
+	if(Status_register == PB1_interrupt)
+		{
+
+			FLAG_STOP_LOCAL_BUFFER = 1;
+
+
+
+			//signaling the state machine that a change has occurred
+			gecko_external_signal(FLAG_STOP_LOCAL_BUFFER);
+
+		}
+
+	//clears the status registers
 	GPIO_IntClear(Status_register);
 
 	//enabling interrupts
 	CORE_ATOMIC_IRQ_ENABLE();
 
-	//signaling the state machine that a change has occurred
-	gecko_external_signal(touch_2_status);
+
+}
+
+/******************************************************
+ * Func name:   initiate_alarm
+ * Description: function to initiate buzzer pins
+ * parameter : none
+ * ***************************************************/
+void initiate_alarm()
+{
+	GPIO_PinOutSet(Alarm_port,Alarm_pin);
+	GPIO_DriveStrengthSet(Alarm_port, gpioDriveStrengthStrongAlternateStrong);
+	GPIO_PinModeSet(Alarm_port, Alarm_pin, gpioModePushPull, 0);
+}
+
+/******************************************************
+ * Func name:   trigger_alarm_on
+ * Description: function to turn on buzzer
+ * parameter : none
+ * ***************************************************/
+void trigger_alarm_on()
+{
+	GPIO_PinOutSet(Alarm_port,Alarm_pin);
+
+}
+
+/******************************************************
+ * Func name:   trigger_alarm_off
+ * Description: function to turn off buzzer
+ * parameter : none
+ * ***************************************************/
+void trigger_alarm_off()
+{
+	GPIO_PinOutClear(Alarm_port,Alarm_pin);
 
 }

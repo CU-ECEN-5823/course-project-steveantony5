@@ -118,7 +118,7 @@ appPlugin: slot-manager=false
       \{
         "Name": "Primary Element",
         "Loc": "0x0000",
-        "NumS": "3",
+        "NumS": "13",
         "NumV": "0",
         "SIG Models": [
           "0x0000",
@@ -126,15 +126,49 @@ appPlugin: slot-manager=false
           "0x1001",
           "Generic OnOff Client",
           "0x1000",
-          "Generic OnOff Server"]
+          "Generic OnOff Server",
+          "0x1303",
+          "Light CTL Server",
+          "0x1304",
+          "Light CTL Setup Server",
+          "0x1004",
+          "Generic Default Transition Time Server",
+          "0x1007",
+          "Generic Power OnOff Setup Server",
+          "0x1002",
+          "Generic Level Server",
+          "0x1301",
+          "Light Lightness Setup Server",
+          "0x1300",
+          "Light Lightness Server",
+          "0x0002",
+          "Health Server",
+          "0x1006",
+          "Generic Power OnOff Server",
+          "0x1003",
+          "Generic Level Client"]
+        ,
+        "Vendor Models": [
+          ]
+      \},
+      \{
+        "Name": "Secondary Element",
+        "Loc": "0x0000",
+        "NumS": "2",
+        "NumV": "0",
+        "SIG Models": [
+          "0x1002",
+          "Generic Level Server",
+          "0x1306",
+          "Light CTL Temperature Server"]
         ,
         "Vendor Models": [
           ]
       \}]
   \},
   "Memory configuration": \{
-    "MAX_ELEMENTS": "1",
-    "MAX_MODELS": "3",
+    "MAX_ELEMENTS": "2",
+    "MAX_MODELS": "15",
     "MAX_APP_BINDS": "4",
     "MAX_SUBSCRIPTIONS": "4",
     "MAX_NETKEYS": "4",
@@ -153,7 +187,7 @@ appPlugin: slot-manager=false
     "MAX_PROVISIONED_DEVICE_NETKEYS": "0",
     "MAX_PROVISIONED_DEVICE_APPKEYS": "0",
     "MAX_FOUNDATION_CLIENT_CMDS": "0",
-    "MAX_FRIENDSHIPS": "1",
+    "MAX_FRIENDSHIPS": "3",
     "FRIEND_MAX_SUBS_LIST": "5",
     "FRIEND_MAX_TOTAL_CACHE": "5",
     "FRIEND_MAX_SINGLE_CACHE": "5"

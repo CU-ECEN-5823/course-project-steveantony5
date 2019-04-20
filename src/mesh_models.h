@@ -1,0 +1,48 @@
+#ifndef MESH_MODELS_H_
+#define MESH_MODELS_H_
+
+
+/**********************************
+ *    Include
+ ***********************************/
+#include <stdio.h>
+#include <stdint.h>
+#include "main.h"
+
+
+/**********************************
+ *    Globals
+ ***********************************/
+extern uint16_t Response;
+
+/**********************************
+ *    Function Prototypes
+ ***********************************/
+
+/*
+--------------------------------------------------------------------------------------------
+generic_level_client_get
+--------------------------------------------------------------------------------------------
+*	This subscribes the models on client
+*
+* 	@\param			lpn address
+*
+* 	@\return		none
+*
+*/
+void generic_level_client_get(uint16_t);
+
+/*
+--------------------------------------------------------------------------------------------
+generic_level_client_set
+--------------------------------------------------------------------------------------------
+*	This does unicast publish to lpn
+*
+* 	@\param			lpn address
+*
+* 	@\return		none
+*
+*/
+void generic_level_client_set(uint16_t);
+
+#endif
