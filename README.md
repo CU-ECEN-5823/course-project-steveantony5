@@ -11,6 +11,7 @@ Group Report:  https://drive.google.com/drive/u/1/folders/19hdArP41vl--8bYrzDXRa
 # Current staus of Checked in Friend Node 
   
     Completed Two way communication between FN and FALL_DETECTION_NODE along with alert system
+    Completed unicast publishing from friend node to LPNs using level model
   
   
 1) Established friendship with all the three low power nodes
