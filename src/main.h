@@ -9,6 +9,11 @@
 #include "init_app.h"
 #include "ble-configuration.h"
 #include "board_features.h"
+#include <stdbool.h>
+#include "native_gecko.h"
+#include "log.h"
+#include "letimer.h"
+#include "ble_mesh_device_type.h"
 
 /* Bluetooth stack headers */
 #include "bg_types.h"
@@ -60,8 +65,8 @@
 #define DELAY                 (108)
 
 #define FALL_DETECTION_NODE                    (0x62)
-#define HEART_BEAT_NODE                        (0x02)
-#define PEOPLE_COUNT_NODE                      (0x03)
+#define HEART_BEAT_NODE                        (0x7a)
+#define PEOPLE_COUNT_NODE                      (0x79)
 
 #define HEARTBEAT_NORMAL_VALUE_MAX             (90)
 #define HEARTBEAT_NORMAL_VALUE_MIN             (40)
@@ -86,15 +91,6 @@ extern int32_t FREQUENCY_OSC;
 
 extern void button_init(void);
 
-/***********************************************************************************************//**
- * @addtogroup Application
- * @{
- **************************************************************************************************/
-
-/***********************************************************************************************//**
- * @addtogroup app
- * @{
- **************************************************************************************************/
 
 // bluetooth stack heap
 #define MAX_CONNECTIONS 2

@@ -1,11 +1,6 @@
 /*****************************************************************
  *              			Includes
  *****************************************************************/
-#include <stdbool.h>
-#include "native_gecko.h"
-#include "log.h"
-#include "letimer.h"
-#include "ble_mesh_device_type.h"
 #include "main.h"
 
 /*****************************************************************
@@ -71,10 +66,12 @@ int main(void)
   //Configuring LETIMER0
   letimer_config();
 
+  //initiating display
   displayInit();
 
   gpioInit();
 
+  //initiating buttons PB0 and PB1
   button_init();
 
   //enable touch sensors
@@ -83,15 +80,14 @@ int main(void)
   //enable touch sensor interrupts
   enable_touch_interrupt();
 
-  displayInit();
-
+  //initiating logger
   logInit();
 
   //initiate pins for buzzer
   initiate_alarm();
 
   //enable interrupt for PB1 button
-  //This is used to stop the buzzer as well as send signal to lpn to stop the lpn buzzer
+  //This is used to stop the buzzer on FN as well as send signal to lpn to stop the lpn buzzer
   enable_PB1_interrupt();
 
   /* Infinite loop */
@@ -122,33 +118,33 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 				LOG_INFO("Entered boot id\n");
 
-				    		/*Factory reset when PB0 is pressed on reset*/
-				    		if (GPIO_PinInGet(BSP_BUTTON0_PORT, BSP_BUTTON0_PIN) == 0 )
-				    		{
-				    			LOG_INFO("factory reset\n");
-				    			displayPrintf(DISPLAY_ROW_ACTION, "Factory reset");
-				    			gecko_cmd_flash_ps_erase_all();
+				/*Factory reset when PB0 is pressed on reset*/
+				if (GPIO_PinInGet(BSP_BUTTON0_PORT, BSP_BUTTON0_PIN) == 0 )
+				{
+					LOG_INFO("factory reset\n");
+					displayPrintf(DISPLAY_ROW_ACTION, "Factory reset");
+					gecko_cmd_flash_ps_erase_all();
 
-				    			/*trigger delay for 2secs and do a reboot*/
-				    			gecko_cmd_hardware_set_soft_timer(2 * 32768, TIMER_ID_RESTART, ONE_SHOT);
+					/*trigger delay for 2secs and do a reboot*/
+					gecko_cmd_hardware_set_soft_timer(2 * 32768, TIMER_ID_RESTART, ONE_SHOT);
 
-				    		}
+				}
 
-				    		else
-				    		{
+				else
+				{
 
-				    			struct gecko_msg_system_get_bt_address_rsp_t *pAddr = gecko_cmd_system_get_bt_address();
+					struct gecko_msg_system_get_bt_address_rsp_t *pAddr = gecko_cmd_system_get_bt_address();
 
-				    			displayPrintf(DISPLAY_ROW_BTADDR,"BT: %x:%x:%x:%x:%x:%x",pAddr->address.addr[5],\
-				    					pAddr->address.addr[4],pAddr->address.addr[3],pAddr->address.addr[2],\
-										pAddr->address.addr[1], pAddr->address.addr[0]);
+					displayPrintf(DISPLAY_ROW_BTADDR,"BT: %x:%x:%x:%x:%x:%x",pAddr->address.addr[5],\
+							pAddr->address.addr[4],pAddr->address.addr[3],pAddr->address.addr[2],\
+							pAddr->address.addr[1], pAddr->address.addr[0]);
 
-				    			set_device_name(&pAddr->address);
+					set_device_name(&pAddr->address);
 
-				    			// Initialize Mesh stack in Node operation mode, it will generate initialized event
-				    			gecko_cmd_mesh_node_init();
+					// Initialize Mesh stack in Node operation mode, it will generate initialized event
+					gecko_cmd_mesh_node_init();
 
-				    		}
+				}
 
 				break;
 
@@ -197,8 +193,6 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 					//initiate node as friend
 					friend_node_init();
-
-
 				}
 				else
 				{
@@ -218,8 +212,6 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 				//initiate node as friend
 				friend_node_init();
-
-
 
 				break;
 
@@ -274,7 +266,6 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 				}
 
-
 				//enters when touch sensors are touched
 				if((((evt->data.evt_system_external_signal.extsignals) & (PRESSED)) || ((evt->data.evt_system_external_signal.extsignals) & (RELEASED))))
 				{
@@ -315,7 +306,7 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 					 displayPrintf(DISPLAY_ROW_PASSKEY, "No of doctors %d",doctor_count);
 
 
-					CORE_EXIT_CRITICAL();
+					 CORE_EXIT_CRITICAL();
 
 				}
 
@@ -340,13 +331,12 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 					CORE_EXIT_CRITICAL();
 
 				}
-				 break;
+				break;
 
 			case gecko_evt_mesh_generic_client_server_status_id:
 			    {
 
 			    	publisher_address = evt->data.evt_mesh_generic_client_server_status.server_address;
-
 
 			    	/*Fall Detection*/
 			    	if((publisher_address) == FALL_DETECTION_NODE)
@@ -358,16 +348,23 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 							| (evt->data.evt_mesh_generic_client_server_status.parameters.data[0]);
 
 
+			    		//When fall is detected
 			    		if(fall_or_tap == FALL_DETECTED)
 			    		{
 			    			LOG_INFO("Patient fell down: Trigger alarm\n");
 			    			displayPrintf(DISPLAY_ROW_TEMPVALUE, "Pat Fell down");
+
+
 			    			trigger_alarm();
 			    		}
+
+			    		//When tap is detected
 			    		if (fall_or_tap == TAP_DETECTED)
 			    		{
 			    			LOG_INFO("Patient Tapped: calling nurse\n");
 			    			displayPrintf(DISPLAY_ROW_TEMPVALUE, "Calling nurse");
+
+
 			    			trigger_alarm();
 			    		}
 			    		fall_or_tap = 0;
@@ -392,7 +389,7 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 						}
 					}
 
-					/*People counter*/
+					/*People counter node*/
 					if((publisher_address) == PEOPLE_COUNT_NODE)
 					{
 						LOG_INFO("Received data from PEOPLE_COUNT_NODE\n");

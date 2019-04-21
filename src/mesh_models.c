@@ -26,7 +26,7 @@ uint16_t Element_Index = 0, Appkey_Index;
  *****************************************************************/
 void generic_level_client_get(uint16_t lpn_addr)
 {
-	LOG_INFO("Getting publish data from LPN %x\n",lpn_addr);
+	LOG_INFO("Getting publish data from LPN addr %x\n",lpn_addr);
 
 	Response = mesh_lib_generic_client_get(
 				MESH_GENERIC_LEVEL_CLIENT_MODEL_ID,
@@ -77,7 +77,7 @@ void generic_level_client_set(uint16_t lpn_addr)
 		  if (response)
 		  {
 
-			LOG_INFO("mesh_lib_generic_client_set failed,code %d\r\n", response);
+			LOG_INFO("mesh_lib_generic_client_set in FALL_DETECTION_NODE failed,code %d\r\n", response);
 		  }
 	}
 
@@ -108,7 +108,7 @@ void generic_level_client_set(uint16_t lpn_addr)
 			  if (response)
 			  {
 
-				LOG_INFO("mesh_lib_generic_client_set failed,code %d\r\n", response);
+				LOG_INFO("mesh_lib_generic_client_set in HEART_BEAT_NODE failed,code %d\r\n", response);
 			  }
 		}
 
@@ -139,7 +139,7 @@ void generic_level_client_set(uint16_t lpn_addr)
 				  if (response)
 				  {
 
-					LOG_INFO("mesh_lib_generic_client_set failed,code %d\r\n", response);
+					LOG_INFO("mesh_lib_generic_client_set in PEOPLE_COUNT_NODE failed,code %d\r\n", response);
 				  }
 			}
 
