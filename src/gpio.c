@@ -14,7 +14,7 @@
  *    Global
  ***********************************/
 int32_t FLAG_STOP_LOCAL_BUFFER = 0;
-
+int32_t FLAG_STOP_DEFRIBRILLATION = 0;
 
 /******************************************************
  * Func name:   gpioInit
@@ -25,8 +25,6 @@ void gpioInit()
 {
 	GPIO_DriveStrengthSet(LED1_port, gpioDriveStrengthStrongAlternateStrong);
 	GPIO_PinModeSet(LED1_port, LED1_pin, gpioModePushPull, false);
-
-
 }
 
 /******************************************************
@@ -121,9 +119,10 @@ void enable_touch_interrupt()
  * Description: function to enable PB1 button interrupt
  * parameter : none
  * ***************************************************/
-void enable_PB1_interrupt()
+void enable_button_interrupt()
 {
-	GPIO_IntConfig(PB0_port, PB1_pin, RISING_EDGE, false, true);
+	GPIO_IntConfig(PB0_port, PB0_pin, RISING_EDGE, false, true);
+	GPIO_IntConfig(PB1_port, PB1_pin, RISING_EDGE, false, true);
 }
 /*****************************************************************
  * Function name: GPIO_EVEN_IRQHandler
@@ -137,16 +136,43 @@ void GPIO_EVEN_IRQHandler()
 	//disabling interrupts
 	CORE_ATOMIC_IRQ_DISABLE();
 
+	//LOG_INFO("Even int \n");
 	//gets the status of the interrupt
 	int Status_register = GPIO_IntGet();
+	//LOG_INFO("Status_register %d\n",Status_register);
 
-	//reads the state of PB0 pin whether it is 0 or 1
-	int touch_1 =  !(GPIO_PinInGet(Touch_sensor_1_port, Touch_1_pin));
+	//for touch sensor
+		if(Status_register == TOUCH_1_interrupt)
+		{
 
-	LOG_INFO("Event occurred touch 1 %d\n",touch_1);
+			int touch_1 =  !(GPIO_PinInGet(Touch_sensor_1_port, Touch_1_pin));
 
-	if (touch_1 == 0)
-		touch_1_status = 2; //2  - 0b10
+			//LOG_INFO("Event occurred touch 1\n");
+
+			if (touch_1 == 0)
+				touch_1_status = 2; //2  - 0b10
+
+
+
+
+			//signaling the state machine that a change has occurred
+			gecko_external_signal(touch_1_status);
+		}
+
+		//for PB1
+		if(Status_register == PB0_interrupt)
+		{
+
+			FLAG_STOP_DEFRIBRILLATION = 1;
+
+
+
+			//signaling the state machine that a change has occurred
+			gecko_external_signal(FLAG_STOP_DEFRIBRILLATION);
+
+		}
+
+
 
 
 	//clearing the interrupt status register
@@ -155,8 +181,7 @@ void GPIO_EVEN_IRQHandler()
 	//enabling interrupts
 	CORE_ATOMIC_IRQ_ENABLE();
 
-	//signaling the state machine that a change has occurred
-	gecko_external_signal(touch_1_status);
+
 
 
 }
@@ -176,7 +201,7 @@ void GPIO_ODD_IRQHandler()
 	//gets the status of the interrupt
 	int Status_register = GPIO_IntGet();
 
-	LOG_INFO("Status_register %d\n",Status_register);
+	//LOG_INFO("Status_register %d\n",Status_register);
 
 	//for touch sensor
 	if(Status_register == TOUCH_2_interrupt)
@@ -185,7 +210,7 @@ void GPIO_ODD_IRQHandler()
 		//reads the state of PB0 pin whether it is 0 or 1
 		int touch_2 =  !(GPIO_PinInGet(Touch_sensor_2_port, Touch_2_pin));
 
-		LOG_INFO("Event occurred touch 2 %d\n",touch_2);
+		//LOG_INFO("Event occurred touch 2 %d\n",touch_2);
 
 		if (touch_2 == 0)
 			touch_2_status = 2; //2  - 0b10
@@ -238,6 +263,8 @@ void initiate_alarm()
  * ***************************************************/
 void trigger_alarm_on()
 {
+	alarm_on = 1;
+	ps_save_data(ALARM_STATE_PS_ID, &alarm_on, sizeof(alarm_on));
 	GPIO_PinOutSet(Alarm_port,Alarm_pin);
 
 }
@@ -249,6 +276,8 @@ void trigger_alarm_on()
  * ***************************************************/
 void trigger_alarm_off()
 {
+	alarm_on = 0;
+	ps_save_data(ALARM_STATE_PS_ID, &alarm_on, sizeof(alarm_on));
 	GPIO_PinOutClear(Alarm_port,Alarm_pin);
 
 }

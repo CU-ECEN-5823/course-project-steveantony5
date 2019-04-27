@@ -24,7 +24,7 @@
 
 
 #define MESH_CFG_MAX_ELEMENTS                   2
-#define MESH_CFG_MAX_MODELS                     15
+#define MESH_CFG_MAX_MODELS                     13
 #define MESH_CFG_MAX_APP_BINDS                  4
 #define MESH_CFG_MAX_SUBSCRIPTIONS              4
 #define MESH_CFG_MAX_NETKEYS                    4
@@ -43,7 +43,7 @@
 #define MESH_CFG_MAX_PROVISIONED_DEVICE_APPKEYS 0
 #define MESH_CFG_MAX_PROVISIONED_DEVICE_NETKEYS 0
 #define MESH_CFG_MAX_FOUNDATION_CLIENT_CMDS     0
-#define MESH_CFG_MAX_FRIENDSHIPS                3
+#define MESH_CFG_MAX_FRIENDSHIPS                5
 #define MESH_CFG_FRIEND_MAX_SUBS_LIST           5
 #define MESH_CFG_FRIEND_MAX_TOTAL_CACHE         5
 #define MESH_CFG_FRIEND_MAX_SINGLE_CACHE        5

@@ -47,18 +47,26 @@ int local_button_press = 0;
 
 uint8 request_count;
 
+uint32_t spray_inc_frequency = 0;
+
+int8_t alarm_on;
 
 /// transaction identifier
 uint8 trid = 0;
 
+uint16_t people_count = 0;
+uint16_t pre_count = 0;
+int8_t LPN_count = 0;
 /**********************************
  *    Main
  ***********************************/
 int main(void)
 {
 
+#if MESH
   // Initialize mesh api's
   mesh_init();
+#endif
 
   //Clock Management Unit initialize
   cmu_init();
@@ -86,12 +94,19 @@ int main(void)
   //initiate pins for buzzer
   initiate_alarm();
 
+#if !(MESH)
+  sleep_config();
+#endif
   //enable interrupt for PB1 button
   //This is used to stop the buzzer on FN as well as send signal to lpn to stop the lpn buzzer
-  enable_PB1_interrupt();
+  enable_button_interrupt();
+
+
 
   /* Infinite loop */
   while (1) {
+
+#if MESH
 	struct gecko_cmd_packet *evt = gecko_wait_event();
 	bool pass = mesh_bgapi_listener(evt);
 	if (pass) {
@@ -99,6 +114,9 @@ int main(void)
 
 
 	}
+#else
+	SLEEP_Sleep();
+#endif
   };
 }
 
@@ -117,6 +135,13 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 			case gecko_evt_system_boot_id:
 
 				LOG_INFO("Entered boot id\n");
+
+				ps_load_data(DOCTOR_COUNT_PS_ID, &doctor_count, sizeof(doctor_count));
+				ps_load_data(ALARM_STATE_PS_ID,&alarm_on,sizeof(alarm_on));
+				if(alarm_on == 1)
+				{
+					trigger_alarm_on();
+				}
 
 				/*Factory reset when PB0 is pressed on reset*/
 				if (GPIO_PinInGet(BSP_BUTTON0_PORT, BSP_BUTTON0_PIN) == 0 )
@@ -141,6 +166,8 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 					set_device_name(&pAddr->address);
 
+					displayPrintf(DISPLAY_ROW_NAME, "Friend Node");
+
 					// Initialize Mesh stack in Node operation mode, it will generate initialized event
 					gecko_cmd_mesh_node_init();
 
@@ -164,6 +191,14 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 					case ENABLE_TOUCH_2:
 						 NVIC_EnableIRQ(GPIO_ODD_IRQn);
 						break;
+
+//					case TIMER_ID_RETRANS:
+//						  send_onoff_request(1);   // param 1 indicates that this is a retransmission
+//						  // stop retransmission timer if it was the last attempt
+//						  if (request_count == 0) {
+//							gecko_cmd_hardware_set_soft_timer(0, TIMER_ID_RETRANS, 0);
+//						  }
+//						  break;
 
 
 					case NONE:
@@ -222,10 +257,12 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 			case gecko_evt_le_connection_opened_id:
 				displayPrintf(DISPLAY_ROW_CONNECTION, "Connected");
+				LOG_INFO("Opened id\n");
 				break;
 
 			case gecko_evt_le_connection_closed_id:
 				displayPrintf(DISPLAY_ROW_CONNECTION, "");
+				LOG_INFO("Closed id\n");
 				break;
 
 			case gecko_evt_mesh_node_reset_id:
@@ -244,10 +281,18 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 			case gecko_evt_mesh_friend_friendship_established_id:
 				LOG_INFO("evt gecko_evt_mesh_friend_friendship_established, lpn_address=%x\r\n", evt->data.evt_mesh_friend_friendship_established.lpn_address);
+				displayPrintf(DISPLAY_ROW_PASSKEY, "No of doctors %d",doctor_count);
+				LPN_count++;
+				displayPrintf(DISPLAY_ROW_BTADDR2, "No of LPNs %d",LPN_count);
+
 				break;
 
 			case gecko_evt_mesh_friend_friendship_terminated_id:
 				LOG_INFO("evt gecko_evt_mesh_friend_friendship_terminated, reason=%x\r\n", evt->data.evt_mesh_friend_friendship_terminated.reason);
+				LPN_count--;
+				displayPrintf(DISPLAY_ROW_BTADDR2, "No of LPNs %d",LPN_count);
+
+
 				break;
 
 			case gecko_evt_system_external_signal_id:
@@ -280,7 +325,7 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 						 LOG_INFO("doctor entered\n");
 						 doctor_count +=1;
 						 NVIC_DisableIRQ(GPIO_EVEN_IRQn);
-						 gecko_cmd_hardware_set_soft_timer(4 * 32768, ENABLE_TOUCH_1, 1);
+						 gecko_cmd_hardware_set_soft_timer(3 * 32768, ENABLE_TOUCH_1, 1);
 
 					 }
 
@@ -294,7 +339,7 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 							 doctor_count -=1;
 
 						 NVIC_DisableIRQ(GPIO_ODD_IRQn);
-						 gecko_cmd_hardware_set_soft_timer(4 * 32768, ENABLE_TOUCH_2, 1);
+						 gecko_cmd_hardware_set_soft_timer(3 * 32768, ENABLE_TOUCH_2, 1);
 					 }
 
 
@@ -305,6 +350,16 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 					 LOG_INFO("Doctor count %d\n",doctor_count);
 					 displayPrintf(DISPLAY_ROW_PASSKEY, "No of doctors %d",doctor_count);
 
+
+					 if(doctor_count == 0)
+					 {
+						 trigger_alarm_on();
+					 }
+					 else
+					 {
+						 trigger_alarm_off();
+					 }
+					 ps_save_data(DOCTOR_COUNT_PS_ID, &doctor_count, sizeof(doctor_count));
 
 					 CORE_EXIT_CRITICAL();
 
@@ -322,11 +377,33 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 					trigger_alarm_off();
 
 					LOG_INFO("Stopping local buffer ringing on Fall detection LPN\n");
+					displayPrintf(DISPLAY_ROW_TEMPVALUE, " ");
 
 					FLAG_STOP_LOCAL_BUFFER = FALSE;
 
 					//sends signal to stop buzzer on FALL_DETECTION_NODE
-					generic_level_client_set(FALL_DETECTION_NODE);
+					generic_onoff_client_set(FALL_DETECTION_NODE, 1);
+
+					CORE_EXIT_CRITICAL();
+
+				}
+
+				if((evt->data.evt_system_external_signal.extsignals) & (FLAG_STOP_DEFRIBRILLATION))
+				{
+					CORE_DECLARE_IRQ_STATE;
+
+					CORE_ENTER_CRITICAL();
+
+					LOG_INFO("Stopping defibrillation on Heart beat LPN\n");
+					displayPrintf(DISPLAY_ROW_CLIENTADDR, " ");
+
+					FLAG_STOP_DEFRIBRILLATION = FALSE;
+
+					//sends signal to stop buzzer on FALL_DETECTION_NODE
+					generic_onoff_client_set(HEART_BEAT_NODE, 1);
+
+					//turn off buzzer
+					trigger_alarm_off();
 
 					CORE_EXIT_CRITICAL();
 
@@ -341,7 +418,7 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 			    	/*Fall Detection*/
 			    	if((publisher_address) == FALL_DETECTION_NODE)
 			    	{
-			    		LOG_INFO("Received data from FALL_DETECTION_NODE\n");
+			    		//LOG_INFO("Received data from FALL_DETECTION_NODE\n");
 			    		uint16_t fall_or_tap;
 
 			    		fall_or_tap = ((evt->data.evt_mesh_generic_client_server_status.parameters.data[1])<<8)\
@@ -352,20 +429,20 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 			    		if(fall_or_tap == FALL_DETECTED)
 			    		{
 			    			LOG_INFO("Patient fell down: Trigger alarm\n");
-			    			displayPrintf(DISPLAY_ROW_TEMPVALUE, "Pat Fell down");
+			    			displayPrintf(DISPLAY_ROW_TEMPVALUE, "Patient Fell down");
 
 
-			    			trigger_alarm();
+			    			trigger_alarm_on();
 			    		}
 
 			    		//When tap is detected
 			    		if (fall_or_tap == TAP_DETECTED)
 			    		{
 			    			LOG_INFO("Patient Tapped: calling nurse\n");
-			    			displayPrintf(DISPLAY_ROW_TEMPVALUE, "Calling nurse");
+			    			displayPrintf(DISPLAY_ROW_TEMPVALUE, "Patient Calls nurse");
 
 
-			    			trigger_alarm();
+			    			trigger_alarm_on();
 			    		}
 			    		fall_or_tap = 0;
 			    	}
@@ -373,45 +450,67 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 			    	/*Heart beat node*/
 					if((publisher_address) == HEART_BEAT_NODE)
 					{
-						LOG_INFO("Received data from HEART_BEAT_NODE\n");
+						//LOG_INFO("Received data from HEART_BEAT_NODE\n");
 						uint16_t heartbeat;
 
 						heartbeat = ((evt->data.evt_mesh_generic_client_server_status.parameters.data[1])<<8)\
 							| (evt->data.evt_mesh_generic_client_server_status.parameters.data[0]);
 
 
-						LOG_INFO("Heart beat : %d\n",heartbeat);
+						LOG_INFO("Abnormal Heart beat : %d\n",heartbeat);
+						displayPrintf(DISPLAY_ROW_CLIENTADDR, "Patient HB abnormal");
 
-						if((heartbeat > HEARTBEAT_NORMAL_VALUE_MAX) || (heartbeat < HEARTBEAT_NORMAL_VALUE_MIN))
-						{
-							LOG_INFO("Patient heart beat abnormal: Trigger alarm\n");
-							generic_level_client_set(HEART_BEAT_NODE);
-						}
+						LOG_INFO("Patient heart beat is abnormal: Trigger alarm\n");
+						trigger_alarm_on();
+
 					}
 
 					/*People counter node*/
 					if((publisher_address) == PEOPLE_COUNT_NODE)
 					{
 						LOG_INFO("Received data from PEOPLE_COUNT_NODE\n");
-						uint16_t people_count;
+
 
 						people_count = ((evt->data.evt_mesh_generic_client_server_status.parameters.data[1])<<8)\
 							| (evt->data.evt_mesh_generic_client_server_status.parameters.data[0]);
 
 
-						LOG_INFO("Heart beat : %d\n",people_count);
+						LOG_INFO("People count : %d\n",people_count);
 
-						if((people_count >= PEOPLE_COUNT_MAX))
+
+						if((people_count >= PEOPLE_COUNT_MAX) && (pre_count < people_count))
 						{
-							LOG_INFO("Many visitors are in the room, increase spray frequency\n");
-							generic_level_client_set(PEOPLE_COUNT_NODE);
+							spray_inc_frequency++;
+							LOG_INFO("Many visitors are in the room, increased spray frequency\n");
+							generic_onoff_client_set(PEOPLE_COUNT_NODE, 1);
+							displayPrintf(DISPLAY_ROW_CONNECTION, "Spray freq dec",spray_inc_frequency);
 						}
+
+						else if((people_count >= PEOPLE_COUNT_MAX) &&(pre_count > people_count))
+						{
+							if(spray_inc_frequency > 0)
+							{
+								LOG_INFO("Less visitors are in the room, decreased spray frequency\n");
+								spray_inc_frequency--;
+								generic_onoff_client_set(PEOPLE_COUNT_NODE, 0);
+								displayPrintf(DISPLAY_ROW_CONNECTION, "Spray freq inc",spray_inc_frequency);
+							}
+						}
+						else
+						{
+							displayPrintf(DISPLAY_ROW_CONNECTION,"People within limit");
+						}
+
+						LOG_INFO("spray_inc_frequency : %d\n",spray_inc_frequency);
+
+						pre_count = people_count;
 					}
 
 			    }
 		}
 
 	}
+
 
 /******************************************************
  * Func name:   set_device_name
@@ -463,12 +562,33 @@ void friend_node_init()
 	}
 }
 
-/******************************************************
- * Func name:   trigger_alarm
- * Description: function to turn on the buzzer
- * parameter : none
- * ***************************************************/
-void trigger_alarm()
+
+
+uint16_t ps_save_data(uint16_t key, void *pValue, uint8_t size)
 {
-	trigger_alarm_on();
+	struct gecko_msg_flash_ps_save_rsp_t *pResp;
+
+	pResp = gecko_cmd_flash_ps_save(key, size, pValue);
+
+	return(pResp->result);
+}
+
+uint16_t ps_load_data(uint16_t key, void *pValue, uint8_t size)
+{
+	struct gecko_msg_flash_ps_load_rsp_t *pResp;
+
+	pResp = gecko_cmd_flash_ps_load(key);
+
+	if(pResp->result == 0)
+	{
+		memcpy(pValue, pResp->value.data, pResp->value.len);
+
+		// sanity check: length of data stored in PS key must match the expected value
+		if(size != pResp->value.len)
+		{
+			return(bg_err_unspecified);
+		}
+	}
+
+	return(pResp->result);
 }

@@ -25,10 +25,13 @@
  *****************************************************************/
 #define LED1_port (gpioPortF)
 #define PB0_port (gpioPortF)
+#define PB1_port (gpioPortF)
+
 #define Touch_sensor_1_port (gpioPortF)
 #define Touch_sensor_2_port (gpioPortF)
 #define Alarm_port (gpioPortC)
 #define Alarm_pin (9)
+#define ALARM_STATE_PS_ID                      (0x4100)
 
 
 #define DISPAY_PORT (gpioPortD)
@@ -48,6 +51,9 @@
 #define TOUCH_2_interrupt (32)
 #define PB1_interrupt (128)
 
+
+#define TOUCH_1_interrupt (16)
+#define PB0_interrupt (64)
 /*****************************************************************
  *              			GLOBAL DECLARATIONS
  *****************************************************************/
@@ -57,6 +63,7 @@ button_flag  button_position ;
 button_flag touch_1_status;
 button_flag touch_2_status;
 
+extern int8_t alarm_on;
 
 /*****************************************************************
  *              			FUNCTION PROTYPES
@@ -176,7 +183,7 @@ enable_PB1_interrupt
 * 	@\return		none
 *
 */
-void enable_PB1_interrupt();
+void enable_button_interrupt();
 
 /*
 --------------------------------------------------------------------------------------------
@@ -203,5 +210,8 @@ trigger_alarm_on
 *
 */
 void trigger_alarm_on();
+
+uint16_t ps_save_data(uint16_t key, void *pValue, uint8_t size);
+uint16_t ps_load_data(uint16_t key, void *pValue, uint8_t size);
 
 #endif /* SRC_GPIO_H_ */

@@ -38,7 +38,7 @@
 #include "mesh_lighting_model_capi_types.h"
 #include "mesh_lib.h"
 #include "mesh_init.h"
-
+#include "sleep_config.h"
 /* Device initialization header */
 #include "hal-config.h"
 #include "mesh_models.h"
@@ -54,27 +54,30 @@
 /**********************************************
  *                MACROS
  * ********************************************/
+#define MESH               (1)
 #define TIMER_ID_RESTART       (78)
 #define TIMER_ID_FACTORY_RESET (77)
 #define TIMER_ID_PROVISIONING  (66)
 #define ONE_SHOT                (1)
 #define ENABLE_TOUCH_1        (100)
 #define ENABLE_TOUCH_2        (101)
+#define TIMER_ID_RETRANS      (99)
 
 #define NONE                  (102)
 #define DELAY                 (108)
 
-#define FALL_DETECTION_NODE                    (0x62)
-#define HEART_BEAT_NODE                        (0x7a)
-#define PEOPLE_COUNT_NODE                      (0x79)
+#define FALL_DETECTION_NODE                    (0x1)
+#define HEART_BEAT_NODE                        (0x3)
+#define PEOPLE_COUNT_NODE                      (0x6)
 
-#define HEARTBEAT_NORMAL_VALUE_MAX             (90)
-#define HEARTBEAT_NORMAL_VALUE_MIN             (40)
-#define PEOPLE_COUNT_MAX                       (10)
+#define HEARTBEAT_NORMAL_VALUE_MAX             (2000)
+#define HEARTBEAT_NORMAL_VALUE_MIN             (1100)
+#define PEOPLE_COUNT_MAX                       (5)
 
 #define FALL_DETECTED                          (40)
 #define TAP_DETECTED                           (41)
 
+#define DOCTOR_COUNT_PS_ID                     (0x4000)
 /**********************************************
  *                GLOBALS
  * ********************************************/
@@ -93,7 +96,7 @@ extern void button_init(void);
 
 
 // bluetooth stack heap
-#define MAX_CONNECTIONS 2
+#define MAX_CONNECTIONS 5
 
 
 // Bluetooth advertisement set configuration
@@ -113,7 +116,7 @@ extern void button_init(void);
 extern const struct bg_gattdb_def bg_gattdb_data;
 
 extern int32_t FLAG_STOP_LOCAL_BUFFER;
-
+extern int32_t FLAG_STOP_DEFRIBRILLATION;
 /*
 --------------------------------------------------------------------------------------------
 trigger_alarm
@@ -185,5 +188,7 @@ friend_node_init
 *
 */
 void friend_node_init();
+
+
 
 #endif
