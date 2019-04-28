@@ -1,3 +1,10 @@
+/*
+ * main.c
+ *
+ *  Created on: April 27, 2019
+ *      Author: Steve Antony
+ */
+
 /*****************************************************************
  *              			Includes
  *****************************************************************/
@@ -5,6 +12,7 @@
 
 /*****************************************************************
  *            Mode Selection for LETIMER clock selection
+ *      sleepEM3 mode is chosen such that ULFRCO_FREQ is used
  *****************************************************************/
 /** Status value for EM0.
 sleepEM0 = 0,
@@ -21,7 +29,7 @@ sleepEM3 = 3,
  Status value for EM4.
 sleepEM4 = 4 */
 
-const int sleep_mode_select = sleepEM0;
+const int sleep_mode_select = sleepEM3;
 
 /**********************************
  *    GLOBALS
@@ -62,10 +70,8 @@ int8_t LPN_count = 0;
 int main(void)
 {
 
-#if MESH
   // Initialize mesh api's
   mesh_init();
-#endif
 
   //Clock Management Unit initialize
   cmu_init();
@@ -91,10 +97,6 @@ int main(void)
   //initiate pins for buzzer
   initiate_alarm();
 
-#if !(MESH)
-  sleep_config();
-#endif
-
   //enable button interrupts
   //This is used to stop the buzzer on FN as well as send signal to lpns
   enable_button_interrupt();
@@ -104,7 +106,6 @@ int main(void)
   /* Infinite loop */
   while (true) {
 
-#if MESH
 	struct gecko_cmd_packet *evt = gecko_wait_event();
 	bool pass = mesh_bgapi_listener(evt);
 	if (pass) {
@@ -112,9 +113,6 @@ int main(void)
 
 
 	}
-#else
-	SLEEP_Sleep();
-#endif
   };
 }
 
@@ -171,8 +169,10 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 					displayPrintf(DISPLAY_ROW_NAME, "Friend Node");
 
+#if MESH
 					// Initialize Mesh stack in Node operation mode, it will generate initialized event
 					gecko_cmd_mesh_node_init();
+#endif
 
 				}
 
@@ -204,6 +204,7 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 				case gecko_evt_mesh_node_initialized_id:
 					LOG_DEBUG("In gecko_evt_mesh_node_initialized_id event\n");
 
+#if MESH
 				 //initiating the friend node as client
 				 Response = gecko_cmd_mesh_generic_client_init()->result;
 				if(Response)
@@ -218,14 +219,16 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 					  //Initialize Friend functionality
 					LOG_INFO("Friend mode initialization\r\n");
 
+
 					//initiate node as friend
 					friend_node_init();
+
 				}
 				else
 				{
 					gecko_cmd_mesh_node_start_unprov_beaconing(0x3);
 				}
-
+#endif
 				break;
 
 			case gecko_evt_mesh_node_provisioning_started_id:
@@ -237,8 +240,10 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 				displayPrintf(DISPLAY_ROW_ACTION, "Provisioned");
 				LOG_INFO("Provisioned\n");
 
+#if MESH
 				//initiate node as friend
 				friend_node_init();
+#endif
 
 				break;
 

@@ -77,7 +77,7 @@ void LETIMER0_IRQHandler(void)
 	if(flags_set & LETIMER_IF_COMP0)
 	{
  		LETIMER_IntClear(LETIMER0, LETIMER_IFC_COMP0);
- 		FLAG_PERIODIC_1 = TRUE; //interrupt flag for display update
+ 		FLAG_PERIODIC_1 = true; //interrupt flag for display update
  		counter++;// counter for time stamp
 	}
 

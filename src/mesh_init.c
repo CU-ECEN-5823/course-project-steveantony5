@@ -1,4 +1,5 @@
 
+
  /*******************************************************************************
  * # License
  * <b>Copyright 2018 Silicon Laboratories Inc. www.silabs.com</b>
@@ -21,6 +22,7 @@ const gecko_configuration_t config_custom =
 {
   .bluetooth.max_connections = MAX_CONNECTIONS,
   .bluetooth.max_advertisers = MAX_ADVERTISERS,
+  .sleep.flags = SLEEP_FLAGS_DEEP_SLEEP_ENABLE,
   .bluetooth.heap = bluetooth_stack_heap,
   .bluetooth.heap_size = sizeof(bluetooth_stack_heap) - BTMESH_HEAP_SIZE,
   .bluetooth.sleep_clock_accuracy = 100,
