@@ -3,6 +3,7 @@
  *
  *  Created on: April 27, 2019
  *      Author: Steve Antony
+ * Description: This file contains functions for enabling buttons, Touch sensors and their interrupts
  */
 
 /**********************************
@@ -117,7 +118,7 @@ void GPIO_EVEN_IRQHandler()
 			int touch_1 =  !(GPIO_PinInGet(Touch_sensor_1_port, Touch_1_pin));
 
 			if (touch_1 == CLEAR)
-				touch_1_status = PRESSED; //2  - 0b10
+				touch_1_status = PRESSED;
 
 			//signaling the state machine that a change has occurred
 			gecko_external_signal(touch_1_status);

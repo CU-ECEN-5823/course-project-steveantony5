@@ -3,6 +3,8 @@
  /*******************************************************************************
  * # License
  * <b>Copyright 2018 Silicon Laboratories Inc. www.silabs.com</b>
+ * Description: This file contains initialization functions to set the node as
+ *              friend node
  *******************************************************************************/
 
 /*****************************************************************

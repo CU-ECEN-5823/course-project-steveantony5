@@ -1,8 +1,12 @@
 
- /*******************************************************************************
- * # License
- * <b>Copyright 2018 Silicon Laboratories Inc. www.silabs.com</b>
- *******************************************************************************/
+/*
+ * mesh_models.c
+ *
+ *  Created on: April 27, 2019
+ *      Author: Steve Antony
+ * Description: This file contains functions to publish in on-off model and
+ *              subscribe in level model
+ */
 
 /*****************************************************************
  *              			INCLUDES
@@ -18,6 +22,7 @@ uint16_t Element_Index = 0, Appkey_Index;
 /*****************************************************************
  *              			Macros
  *****************************************************************/
+/*Model specific state type- tells the kind of state to retrive*/
 #define Generic_Level_State_Type		(2)
 
 
@@ -44,7 +49,7 @@ void generic_level_client_get(uint16_t lpn_addr)
 }
 
 /*****************************************************************
- *            Function to subscribe using on-off model
+ *            Function to publish using on-off model
  *****************************************************************/
 void generic_onoff_client_set(uint16_t lpn_addr,bool data)
 {
@@ -52,7 +57,8 @@ void generic_onoff_client_set(uint16_t lpn_addr,bool data)
 	if(lpn_addr == FALL_DETECTION_NODE)
 	{
 		LOG_INFO("Publising on-off data to FALL_DETECTION_NODE\n");
-		static uint16_t trid;
+
+		static uint16_t trid; //transaction id
 
 		errorcode_t	response;
 		trid += 1;

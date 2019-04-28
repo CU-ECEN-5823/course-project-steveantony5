@@ -3,6 +3,7 @@
  *
  *  Created on: April 27, 2019
  *      Author: Steve Antony
+ * Description: This file contains the mesh scheduler and friend node application
  */
 
 /*****************************************************************
@@ -225,6 +226,7 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 				}
 				else
 				{
+					//if not provisioned, send advertising signal for the provisioner to provision
 					gecko_cmd_mesh_node_start_unprov_beaconing(0x3);
 				}
 #endif
@@ -248,7 +250,7 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 			case gecko_evt_mesh_node_provisioning_failed_id:
 				LOG_ERROR("Provisioning failed\n");
-				displayPrintf(DISPLAY_ROW_ACTION, "Provisioned Failed");
+				displayPrintf(DISPLAY_ROW_ACTION, "Provision Failed");
 				break;
 
 
@@ -555,29 +557,22 @@ void friend_node_init()
 
 
 /******************************************************
- * Func name:   ps_save_data
- * Description: save data to Flash
- * parameter : key     - unique key to store
- *             *pvalue - address of the value to be stored
- *             size    - size of the variable to be stored
- * ***************************************************/
-uint16_t ps_save_data(uint16_t key, void *pValue, uint8_t size)
+ *  Store data to persistent memory
+ ******************************************************/
+void ps_save_data(uint16_t key, void *pValue, uint8_t size)
 {
 	struct gecko_msg_flash_ps_save_rsp_t *pResp;
 
 	pResp = gecko_cmd_flash_ps_save(key, size, pValue);
 
-	return(pResp->result);
+	if(pResp->result != 0)
+		LOG_ERROR("Error on saving ps data\n");
 }
 
 /******************************************************
- * Func name:   ps_load_data
- * Description: load data from Flash
- * parameter : key     - unique key to store
- *             *pvalue - address of the value to be stored
- *             size    - size of the variable to be stored
- * ***************************************************/
-uint16_t ps_load_data(uint16_t key, void *pValue, uint8_t size)
+ *  Load stored data from persistent memory
+ ******************************************************/
+void ps_load_data(uint16_t key, void *pValue, uint8_t size)
 {
 	struct gecko_msg_flash_ps_load_rsp_t *pResp;
 
@@ -587,12 +582,13 @@ uint16_t ps_load_data(uint16_t key, void *pValue, uint8_t size)
 	{
 		memcpy(pValue, pResp->value.data, pResp->value.len);
 
-		// sanity check: length of data stored in PS key must match the expected value
 		if(size != pResp->value.len)
 		{
-			return(bg_err_unspecified);
+			LOG_ERROR("Error on ps load data due to length mis-alignment\n");
 		}
 	}
 
-	return(pResp->result);
+	else
+		LOG_ERROR("Error on retriving ps load data\n");
+
 }

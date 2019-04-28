@@ -59,7 +59,9 @@
 /**********************************************
  *                MACROS
  * ********************************************/
-//set as 1 when it has to function as friend node
+/*set as 1 when it has to function as friend node
+ * set as 0 when it has to be verified for low power consumption in non-friend mode
+ */
 #define MESH                   (1)
 
 //For soft timer

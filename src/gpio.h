@@ -208,7 +208,34 @@ trigger_alarm_on
 */
 void trigger_alarm_on();
 
-uint16_t ps_save_data(uint16_t key, void *pValue, uint8_t size);
-uint16_t ps_load_data(uint16_t key, void *pValue, uint8_t size);
+/*
+--------------------------------------------------------------------------------------------
+ps_save_data
+--------------------------------------------------------------------------------------------
+*	This function helps to store data to flash memory
+*
+* 	@\param			key - unique key to store and retrive
+* 	                *pvalue - address of the value to be stored
+ *                  size    - size of the variable to be stored
+*
+* 	@\return		none
+*
+*/
+void ps_save_data(uint16_t key, void *pValue, uint8_t size);
+
+/*
+--------------------------------------------------------------------------------------------
+ps_load_data
+--------------------------------------------------------------------------------------------
+*	This function helps to load stored data to flash memory
+*
+* 	@\param			key - unique key to store and retrive
+* 	                *pvalue - address of the value to be stored
+ *                  size    - size of the variable to be stored
+*
+* 	@\return		none
+*
+*/
+void ps_load_data(uint16_t key, void *pValue, uint8_t size);
 
 #endif /* SRC_GPIO_H_ */
