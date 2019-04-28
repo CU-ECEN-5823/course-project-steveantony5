@@ -54,7 +54,7 @@
 #include "bspconfig.h"
 #endif
 #include "ble_mesh_device_type.h"
-
+#include "gecko_ble_errors.h"
 
 /**********************************************
  *                MACROS
@@ -71,9 +71,9 @@
 
 
 /*Node Address of Lower power nodes*/
-#define FALL_DETECTION_NODE                    (0x6)
-#define HEART_BEAT_NODE                        (0x1)
-#define PEOPLE_COUNT_NODE                      (0x2)
+#define FALL_DETECTION_NODE                    (0x3)
+#define HEART_BEAT_NODE                        (0x2)
+#define PEOPLE_COUNT_NODE                      (0x1)
 
 /*Threshold for maximum people count*/
 #define PEOPLE_COUNT_MAX                       (5)
@@ -89,7 +89,7 @@
  * ********************************************/
 
 
-/// current position of the button
+//current position of the button
 extern button_flag  button_position ;
 
 extern button_flag touch_1_status;

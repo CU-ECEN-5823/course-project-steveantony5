@@ -127,32 +127,17 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 				LOG_INFO("Entered boot id\n");
 
-				/*load doctor count from Flash*/
-				ps_load_data(DOCTOR_COUNT_PS_ID, &doctor_count, sizeof(doctor_count));
 
-				/*Display the number of doctors*/
-				displayPrintf(DISPLAY_ROW_PASSKEY, "No of doctors %d",doctor_count);
-				if(doctor_count == 0)
-				{
-					trigger_alarm_on();
-				}
-
-				/*load alarm state from Flash*/
-				ps_load_data(ALARM_STATE_PS_ID,&alarm_on,sizeof(alarm_on));
-				if(alarm_on == 1)
-				{
-					trigger_alarm_on();
-				}
 
 				/*Factory reset when PB0 is pressed on reset*/
-				if (GPIO_PinInGet(BSP_BUTTON0_PORT, BSP_BUTTON0_PIN) == 0 )
+				if (GPIO_PinInGet(BSP_BUTTON0_PORT, BSP_BUTTON0_PIN) == false )
 				{
 					LOG_INFO("factory reset\n");
 					displayPrintf(DISPLAY_ROW_ACTION, "Factory reset");
-					gecko_cmd_flash_ps_erase_all();
+					BTSTACK_CHECK_RESPONSE(gecko_cmd_flash_ps_erase_all());
 
 					/*trigger delay for 2secs and do a reboot*/
-					gecko_cmd_hardware_set_soft_timer(2 * 32768, TIMER_ID_RESTART, ONE_SHOT);
+					BTSTACK_CHECK_RESPONSE(gecko_cmd_hardware_set_soft_timer(2 * 32768, TIMER_ID_RESTART, ONE_SHOT));
 
 				}
 
@@ -171,7 +156,7 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 #if MESH
 					// Initialize Mesh stack in Node operation mode, it will generate initialized event
-					gecko_cmd_mesh_node_init();
+					BTSTACK_CHECK_RESPONSE(gecko_cmd_mesh_node_init());
 #endif
 
 				}
@@ -184,7 +169,7 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 				  {
 					case TIMER_ID_RESTART:
 					  // restart timer expires, reset the device
-					  gecko_cmd_system_reset(0);
+						gecko_cmd_system_reset(0);
 					  break;
 
 					//enable EVEN interrupts
@@ -205,13 +190,6 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 					LOG_DEBUG("In gecko_evt_mesh_node_initialized_id event\n");
 
 #if MESH
-				 //initiating the friend node as client
-				 Response = gecko_cmd_mesh_generic_client_init()->result;
-				if(Response)
-				{
-					LOG_ERROR("Error code: %x\n", Response);
-				}
-
 				struct gecko_msg_mesh_node_initialized_evt_t *pData = (struct gecko_msg_mesh_node_initialized_evt_t *)&(evt->data);
 
 				if ((pData->provisioned))
@@ -219,9 +197,30 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 					  //Initialize Friend functionality
 					LOG_INFO("Friend mode initialization\r\n");
 
+					//initiating the friend node as client
+					BTSTACK_CHECK_RESPONSE(gecko_cmd_mesh_generic_client_init());
+
+
 
 					//initiate node as friend
 					friend_node_init();
+
+					/*load doctor count from Flash*/
+					ps_load_data(DOCTOR_COUNT_PS_ID, &doctor_count, sizeof(doctor_count));
+
+					/*Display the number of doctors*/
+					displayPrintf(DISPLAY_ROW_PASSKEY, "No of doctors %d",doctor_count);
+					if(doctor_count == 0)
+					{
+						trigger_alarm_on();
+					}
+
+					/*load alarm state from Flash*/
+					ps_load_data(ALARM_STATE_PS_ID,&alarm_on,sizeof(alarm_on));
+					if(alarm_on == 1)
+					{
+						trigger_alarm_on();
+					}
 
 				}
 				else
@@ -252,32 +251,6 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 				displayPrintf(DISPLAY_ROW_ACTION, "Provisioned Failed");
 				break;
 
-			case gecko_evt_le_connection_opened_id:
-				displayPrintf(DISPLAY_ROW_CONNECTION, "Connected");
-				LOG_DEBUG("gecko_evt_le_connection_opened_id: Opened connection\n");
-				break;
-
-			case gecko_evt_le_connection_closed_id:
-				displayPrintf(DISPLAY_ROW_CONNECTION, "");
-				LOG_DEBUG("gecko_evt_le_connection_closed_id: Closed connection\n");
-				break;
-
-			case gecko_evt_mesh_node_reset_id:
-				gecko_cmd_flash_ps_erase_all();
-				gecko_cmd_hardware_set_soft_timer(2 * 32768, TIMER_ID_RESTART, 1);
-				LOG_DEBUG("Entered gecko_evt_mesh_node_reset_id\n");
-
-				break;
-
-			case gecko_evt_mesh_generic_server_client_request_id:
-				mesh_lib_generic_server_event_handler(evt);
-				LOG_DEBUG("Entered gecko_evt_mesh_generic_server_client_request_id\n");
-				break;
-
-			case gecko_evt_mesh_generic_server_state_changed_id:
-				mesh_lib_generic_server_event_handler(evt);
-				LOG_DEBUG("Entered gecko_evt_mesh_generic_server_state_changed_id\n");
-				break;
 
 			//Triggered when Friendship is established
 			case gecko_evt_mesh_friend_friendship_established_id:
@@ -289,11 +262,19 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 				break;
 
-				//Triggered when Friendship is terminated
+			//Triggered when Friendship is terminated
 			case gecko_evt_mesh_friend_friendship_terminated_id:
 				LOG_INFO("evt gecko_evt_mesh_friend_friendship_terminated, reason=%x\r\n", evt->data.evt_mesh_friend_friendship_terminated.reason);
 				LPN_count--;
 				displayPrintf(DISPLAY_ROW_BTADDR2, "No of LPNs %d",LPN_count);
+
+				break;
+
+			//This event is generated when the Provisioner has ordered the node to be reset
+			case gecko_evt_mesh_node_reset_id:
+				gecko_cmd_flash_ps_erase_all();
+				gecko_cmd_hardware_set_soft_timer(2 * 32768, TIMER_ID_RESTART, 1);
+				LOG_DEBUG("Entered gecko_evt_mesh_node_reset_id\n");
 
 				break;
 
@@ -329,7 +310,7 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 						 NVIC_DisableIRQ(GPIO_EVEN_IRQn);
 
 						 //enable the touch sensor 1 interrupt after 3 seconds
-						 gecko_cmd_hardware_set_soft_timer(3 * 32768, ENABLE_TOUCH_1, ONE_SHOT);
+						 BTSTACK_CHECK_RESPONSE(gecko_cmd_hardware_set_soft_timer(3 * 32768, ENABLE_TOUCH_1, ONE_SHOT));
 
 						 LOG_INFO("Doctor count %d\n",doctor_count);
 						 displayPrintf(DISPLAY_ROW_PASSKEY, "No of doctors %d",doctor_count);
@@ -350,7 +331,7 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 						 NVIC_DisableIRQ(GPIO_ODD_IRQn);
 
 						 //enable the touch sensor 2 interrupt after 3 seconds
-						 gecko_cmd_hardware_set_soft_timer(3 * 32768, ENABLE_TOUCH_2, ONE_SHOT);
+						 BTSTACK_CHECK_RESPONSE(gecko_cmd_hardware_set_soft_timer(3 * 32768, ENABLE_TOUCH_2, ONE_SHOT));
 
 						 LOG_INFO("Doctor count %d\n",doctor_count);
 						 displayPrintf(DISPLAY_ROW_PASSKEY, "No of doctors %d",doctor_count);
@@ -427,6 +408,8 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 				}
 				break;
 
+			/*generated either because of a response to a get or set request
+			 * received by the client model */
 			case gecko_evt_mesh_generic_client_server_status_id:
 			    {
 
@@ -566,11 +549,8 @@ void friend_node_init()
 
 	//Initialize Friend functionality
 	LOG_INFO("Friend mode initialization\n");
-	Response = gecko_cmd_mesh_friend_init()->result;
-	if (Response)
-	{
-		LOG_ERROR("Friend init failed 0x%x\n", Response);
-	}
+	BTSTACK_CHECK_RESPONSE(gecko_cmd_mesh_friend_init());
+
 }
 
 

@@ -196,6 +196,8 @@ void GPIO_ODD_IRQHandler()
  * ***************************************************/
 void initiate_alarm()
 {
+	/*Drive strength is chosen as strong so as to support the buzzer
+	 * Limits at 10mA */
 	GPIO_DriveStrengthSet(Alarm_port, gpioDriveStrengthStrongAlternateStrong);
 	GPIO_PinModeSet(Alarm_port, Alarm_pin, gpioModePushPull, 0);
 }
