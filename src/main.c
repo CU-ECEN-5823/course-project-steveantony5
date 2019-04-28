@@ -4,9 +4,7 @@
 #include "main.h"
 
 /*****************************************************************
- *              			Mode Selection
- *This selection is not used in Assignment 5
- *Hence it is set to 0 for Clock selection purpose in LETIMER0
+ *            Mode Selection for LETIMER clock selection
  *****************************************************************/
 /** Status value for EM0.
 sleepEM0 = 0,
@@ -28,11 +26,8 @@ const int sleep_mode_select = sleepEM0;
 /**********************************
  *    GLOBALS
  ***********************************/
-int8_t FLAG_PERIODIC_3;
+//for logger count and updating the LCD display
 int8_t FLAG_PERIODIC_1;
-
-int8_t FLAG_Delay_80;
-int8_t FLAG_DONE;
 
 //for keeping track of number of available doctors
 int32_t doctor_count =0;
@@ -43,20 +38,24 @@ uint16_t Response;
 //for unicasting to lpn
 uint16_t publisher_address;
 
-int local_button_press = 0;
-
-uint8 request_count;
-
+//For sending spray frequncy to PEOPLE COUNT NODE
 uint32_t spray_inc_frequency = 0;
 
-int8_t alarm_on;
+//to store the alarm state such that it can remain in that state when rebooted
+bool alarm_on;
 
 /// transaction identifier
 uint8 trid = 0;
 
+//store the number of people
 uint16_t people_count = 0;
-uint16_t pre_count = 0;
+
+//store the previous people count
+uint16_t previous_people_count = 0;
+
+//track the total number of LPNs connected to friend node
 int8_t LPN_count = 0;
+
 /**********************************
  *    Main
  ***********************************/
@@ -77,12 +76,10 @@ int main(void)
   //initiating display
   displayInit();
 
-  gpioInit();
-
-  //initiating buttons PB0 and PB1
+  //initiating buttons PB0 and PB1 to send signals to LPN
   button_init();
 
-  //enable touch sensors
+  //enable touch sensors for doctor count
   touch_sensor_init();
 
   //enable touch sensor interrupts
@@ -97,14 +94,15 @@ int main(void)
 #if !(MESH)
   sleep_config();
 #endif
-  //enable interrupt for PB1 button
-  //This is used to stop the buzzer on FN as well as send signal to lpn to stop the lpn buzzer
+
+  //enable button interrupts
+  //This is used to stop the buzzer on FN as well as send signal to lpns
   enable_button_interrupt();
 
 
 
   /* Infinite loop */
-  while (1) {
+  while (true) {
 
 #if MESH
 	struct gecko_cmd_packet *evt = gecko_wait_event();
@@ -126,17 +124,22 @@ int main(void)
  ***********************************/
 void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 {
-		//handle_gecko_event(BGLIB_MSG_ID(evt->header), evt);
-		if (evt == NULL)
-		{
-			return;
-		}
 		switch (evt_id) {
 			case gecko_evt_system_boot_id:
 
 				LOG_INFO("Entered boot id\n");
 
+				/*load doctor count from Flash*/
 				ps_load_data(DOCTOR_COUNT_PS_ID, &doctor_count, sizeof(doctor_count));
+
+				/*Display the number of doctors*/
+				displayPrintf(DISPLAY_ROW_PASSKEY, "No of doctors %d",doctor_count);
+				if(doctor_count == 0)
+				{
+					trigger_alarm_on();
+				}
+
+				/*load alarm state from Flash*/
 				ps_load_data(ALARM_STATE_PS_ID,&alarm_on,sizeof(alarm_on));
 				if(alarm_on == 1)
 				{
@@ -184,25 +187,14 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 					  gecko_cmd_system_reset(0);
 					  break;
 
+					//enable EVEN interrupts
 					case ENABLE_TOUCH_1:
 						 NVIC_EnableIRQ(GPIO_EVEN_IRQn);
 						break;
 
+					//enable ODD interrupts
 					case ENABLE_TOUCH_2:
 						 NVIC_EnableIRQ(GPIO_ODD_IRQn);
-						break;
-
-//					case TIMER_ID_RETRANS:
-//						  send_onoff_request(1);   // param 1 indicates that this is a retransmission
-//						  // stop retransmission timer if it was the last attempt
-//						  if (request_count == 0) {
-//							gecko_cmd_hardware_set_soft_timer(0, TIMER_ID_RETRANS, 0);
-//						  }
-//						  break;
-
-
-					case NONE:
-
 						break;
 
 				}
@@ -210,16 +202,16 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 				break;
 
 				case gecko_evt_mesh_node_initialized_id:
-				 LOG_INFO("In gecko_evt_mesh_node_initialized_id event\n");
+					LOG_DEBUG("In gecko_evt_mesh_node_initialized_id event\n");
 
+				 //initiating the friend node as client
 				 Response = gecko_cmd_mesh_generic_client_init()->result;
 				if(Response)
 				{
-					LOG_INFO("Error code: %x\n", Response);
+					LOG_ERROR("Error code: %x\n", Response);
 				}
 
 				struct gecko_msg_mesh_node_initialized_evt_t *pData = (struct gecko_msg_mesh_node_initialized_evt_t *)&(evt->data);
-
 
 				if ((pData->provisioned))
 				{
@@ -251,59 +243,64 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 				break;
 
 			case gecko_evt_mesh_node_provisioning_failed_id:
-				LOG_INFO("Provisioning failed\n");
+				LOG_ERROR("Provisioning failed\n");
 				displayPrintf(DISPLAY_ROW_ACTION, "Provisioned Failed");
 				break;
 
 			case gecko_evt_le_connection_opened_id:
 				displayPrintf(DISPLAY_ROW_CONNECTION, "Connected");
-				LOG_INFO("Opened id\n");
+				LOG_DEBUG("gecko_evt_le_connection_opened_id: Opened connection\n");
 				break;
 
 			case gecko_evt_le_connection_closed_id:
 				displayPrintf(DISPLAY_ROW_CONNECTION, "");
-				LOG_INFO("Closed id\n");
+				LOG_DEBUG("gecko_evt_le_connection_closed_id: Closed connection\n");
 				break;
 
 			case gecko_evt_mesh_node_reset_id:
 				gecko_cmd_flash_ps_erase_all();
 				gecko_cmd_hardware_set_soft_timer(2 * 32768, TIMER_ID_RESTART, 1);
+				LOG_DEBUG("Entered gecko_evt_mesh_node_reset_id\n");
 
 				break;
 
 			case gecko_evt_mesh_generic_server_client_request_id:
 				mesh_lib_generic_server_event_handler(evt);
+				LOG_DEBUG("Entered gecko_evt_mesh_generic_server_client_request_id\n");
 				break;
 
 			case gecko_evt_mesh_generic_server_state_changed_id:
 				mesh_lib_generic_server_event_handler(evt);
+				LOG_DEBUG("Entered gecko_evt_mesh_generic_server_state_changed_id\n");
 				break;
 
+			//Triggered when Friendship is established
 			case gecko_evt_mesh_friend_friendship_established_id:
 				LOG_INFO("evt gecko_evt_mesh_friend_friendship_established, lpn_address=%x\r\n", evt->data.evt_mesh_friend_friendship_established.lpn_address);
-				displayPrintf(DISPLAY_ROW_PASSKEY, "No of doctors %d",doctor_count);
+
+				//Increment the LPN friendship count after establishing friendship
 				LPN_count++;
 				displayPrintf(DISPLAY_ROW_BTADDR2, "No of LPNs %d",LPN_count);
 
 				break;
 
+				//Triggered when Friendship is terminated
 			case gecko_evt_mesh_friend_friendship_terminated_id:
 				LOG_INFO("evt gecko_evt_mesh_friend_friendship_terminated, reason=%x\r\n", evt->data.evt_mesh_friend_friendship_terminated.reason);
 				LPN_count--;
 				displayPrintf(DISPLAY_ROW_BTADDR2, "No of LPNs %d",LPN_count);
 
-
 				break;
 
 			case gecko_evt_system_external_signal_id:
 				//checks if the event triggered due to change 1 sec interrupt
-				if((evt->data.evt_system_external_signal.extsignals) & (FLAG_PERIODIC_1 == TRUE))
+				if((evt->data.evt_system_external_signal.extsignals) & (FLAG_PERIODIC_1 == true))
 				{
 					CORE_DECLARE_IRQ_STATE;
 
 					CORE_ENTER_CRITICAL();
 
-					FLAG_PERIODIC_1 = FALSE;
+					FLAG_PERIODIC_1 = false;
 
 					CORE_EXIT_CRITICAL();
 
@@ -314,18 +311,23 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 				//enters when touch sensors are touched
 				if((((evt->data.evt_system_external_signal.extsignals) & (PRESSED)) || ((evt->data.evt_system_external_signal.extsignals) & (RELEASED))))
 				{
-					LOG_INFO("Pressed touch\n");
-					CORE_DECLARE_IRQ_STATE;
-
-					CORE_ENTER_CRITICAL();
 
 					//For Doctor-in touch sensor
 					 if(touch_1_status == PRESSED)
 					 {
 						 LOG_INFO("doctor entered\n");
+
+						 //increment doctor count by 1
 						 doctor_count +=1;
+
+						 //disable the touch sensor to avoid multiple triggers due to single touch
 						 NVIC_DisableIRQ(GPIO_EVEN_IRQn);
-						 gecko_cmd_hardware_set_soft_timer(3 * 32768, ENABLE_TOUCH_1, 1);
+
+						 //enable the touch sensor 1 interrupt after 3 seconds
+						 gecko_cmd_hardware_set_soft_timer(3 * 32768, ENABLE_TOUCH_1, ONE_SHOT);
+
+						 LOG_INFO("Doctor count %d\n",doctor_count);
+						 displayPrintf(DISPLAY_ROW_PASSKEY, "No of doctors %d",doctor_count);
 
 					 }
 
@@ -334,23 +336,34 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 					 {
 						 LOG_INFO("doctor left\n");
 
-						 //ensures not to increment below 0
+						 //ensures not to decrement below 0
 						 if(doctor_count != 0)
+							 //decrement doctor count by 1
 							 doctor_count -=1;
 
+						 //disable the touch sensor to avoid multiple triggers due to single touch
 						 NVIC_DisableIRQ(GPIO_ODD_IRQn);
-						 gecko_cmd_hardware_set_soft_timer(3 * 32768, ENABLE_TOUCH_2, 1);
+
+						 //enable the touch sensor 2 interrupt after 3 seconds
+						 gecko_cmd_hardware_set_soft_timer(3 * 32768, ENABLE_TOUCH_2, ONE_SHOT);
+
+						 LOG_INFO("Doctor count %d\n",doctor_count);
+						 displayPrintf(DISPLAY_ROW_PASSKEY, "No of doctors %d",doctor_count);
 					 }
 
+					 CORE_DECLARE_IRQ_STATE;
 
-					 //clear the button variable
+					 CORE_ENTER_CRITICAL();
+					 //clear the flag variables
 					 touch_1_status = CLEAR;
 					 touch_2_status = CLEAR;
 
-					 LOG_INFO("Doctor count %d\n",doctor_count);
-					 displayPrintf(DISPLAY_ROW_PASSKEY, "No of doctors %d",doctor_count);
+					 CORE_EXIT_CRITICAL();
 
 
+
+
+					 /*Turn on the alarm if the doctor count is zero*/
 					 if(doctor_count == 0)
 					 {
 						 trigger_alarm_on();
@@ -359,9 +372,9 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 					 {
 						 trigger_alarm_off();
 					 }
-					 ps_save_data(DOCTOR_COUNT_PS_ID, &doctor_count, sizeof(doctor_count));
 
-					 CORE_EXIT_CRITICAL();
+					 //Store the doctor count in persistent memory
+					 ps_save_data(DOCTOR_COUNT_PS_ID, &doctor_count, sizeof(doctor_count));
 
 				}
 
@@ -370,8 +383,11 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 				if((evt->data.evt_system_external_signal.extsignals) & (FLAG_STOP_LOCAL_BUFFER))
 				{
 					CORE_DECLARE_IRQ_STATE;
-
 					CORE_ENTER_CRITICAL();
+
+					FLAG_STOP_LOCAL_BUFFER = false;
+
+					CORE_EXIT_CRITICAL();
 
 					//turn off buzzer
 					trigger_alarm_off();
@@ -379,33 +395,29 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 					LOG_INFO("Stopping local buffer ringing on Fall detection LPN\n");
 					displayPrintf(DISPLAY_ROW_TEMPVALUE, " ");
 
-					FLAG_STOP_LOCAL_BUFFER = FALSE;
-
 					//sends signal to stop buzzer on FALL_DETECTION_NODE
-					generic_onoff_client_set(FALL_DETECTION_NODE, 1);
+					generic_onoff_client_set(FALL_DETECTION_NODE, true);
 
-					CORE_EXIT_CRITICAL();
 
 				}
 
 				if((evt->data.evt_system_external_signal.extsignals) & (FLAG_STOP_DEFRIBRILLATION))
 				{
 					CORE_DECLARE_IRQ_STATE;
-
 					CORE_ENTER_CRITICAL();
 
-					LOG_INFO("Stopping defibrillation on Heart beat LPN\n");
+					FLAG_STOP_DEFRIBRILLATION = false;
+
+					CORE_EXIT_CRITICAL();
+
+					LOG_INFO("Stopping defibrillator on Heart beat LPN\n");
 					displayPrintf(DISPLAY_ROW_CLIENTADDR, " ");
 
-					FLAG_STOP_DEFRIBRILLATION = FALSE;
-
 					//sends signal to stop buzzer on FALL_DETECTION_NODE
-					generic_onoff_client_set(HEART_BEAT_NODE, 1);
+					generic_onoff_client_set(HEART_BEAT_NODE, true);
 
 					//turn off buzzer
 					trigger_alarm_off();
-
-					CORE_EXIT_CRITICAL();
 
 				}
 				break;
@@ -418,7 +430,6 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 			    	/*Fall Detection*/
 			    	if((publisher_address) == FALL_DETECTION_NODE)
 			    	{
-			    		//LOG_INFO("Received data from FALL_DETECTION_NODE\n");
 			    		uint16_t fall_or_tap;
 
 			    		fall_or_tap = ((evt->data.evt_mesh_generic_client_server_status.parameters.data[1])<<8)\
@@ -444,18 +455,16 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 			    			trigger_alarm_on();
 			    		}
-			    		fall_or_tap = 0;
+			    		fall_or_tap = false;
 			    	}
 
 			    	/*Heart beat node*/
 					if((publisher_address) == HEART_BEAT_NODE)
 					{
-						//LOG_INFO("Received data from HEART_BEAT_NODE\n");
 						uint16_t heartbeat;
 
 						heartbeat = ((evt->data.evt_mesh_generic_client_server_status.parameters.data[1])<<8)\
 							| (evt->data.evt_mesh_generic_client_server_status.parameters.data[0]);
-
 
 						LOG_INFO("Abnormal Heart beat : %d\n",heartbeat);
 						displayPrintf(DISPLAY_ROW_CLIENTADDR, "Patient HB abnormal");
@@ -477,23 +486,25 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 						LOG_INFO("People count : %d\n",people_count);
 
-
-						if((people_count >= PEOPLE_COUNT_MAX) && (pre_count < people_count))
+						/*send command to increase spray frequency when people count is higher than threshold*/
+						if((people_count >= PEOPLE_COUNT_MAX) && (previous_people_count < people_count))
 						{
 							spray_inc_frequency++;
 							LOG_INFO("Many visitors are in the room, increased spray frequency\n");
-							generic_onoff_client_set(PEOPLE_COUNT_NODE, 1);
-							displayPrintf(DISPLAY_ROW_CONNECTION, "Spray freq dec",spray_inc_frequency);
+							generic_onoff_client_set(PEOPLE_COUNT_NODE, true);
+							displayPrintf(DISPLAY_ROW_CONNECTION, "Spray freq inc",spray_inc_frequency);
 						}
 
-						else if((people_count >= PEOPLE_COUNT_MAX) &&(pre_count > people_count))
+						/*send command to decrease spray frequency when people count is higher than threshold
+						 * but lower than previous people count*/
+						else if((people_count >= PEOPLE_COUNT_MAX) &&(previous_people_count > people_count))
 						{
 							if(spray_inc_frequency > 0)
 							{
 								LOG_INFO("Less visitors are in the room, decreased spray frequency\n");
 								spray_inc_frequency--;
-								generic_onoff_client_set(PEOPLE_COUNT_NODE, 0);
-								displayPrintf(DISPLAY_ROW_CONNECTION, "Spray freq inc",spray_inc_frequency);
+								generic_onoff_client_set(PEOPLE_COUNT_NODE, false);
+								displayPrintf(DISPLAY_ROW_CONNECTION, "Spray freq dec",spray_inc_frequency);
 							}
 						}
 						else
@@ -503,7 +514,8 @@ void handle_gecko_event_scheduler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 						LOG_INFO("spray_inc_frequency : %d\n",spray_inc_frequency);
 
-						pre_count = people_count;
+						/*Storing the previous people count*/
+						previous_people_count = people_count;
 					}
 
 			    }
@@ -522,16 +534,10 @@ void set_device_name(bd_addr *pAddr)
   char name[20];
   uint16 res;
 
-#if DEVICE_IS_ONOFF_PUBLISHER
   // create unique device name using the last two bytes of the Bluetooth address
-  sprintf(name, "23P:02x%02x", pAddr->addr[1], pAddr->addr[0]);
+  sprintf(name, "23FN:02x%02x", pAddr->addr[1], pAddr->addr[0]);
 
-#else
-  // create unique device name using the last two bytes of the Bluetooth address
-  sprintf(name, "23S:02x%02x", pAddr->addr[1], pAddr->addr[0]);
-
-#endif
-  LOG_INFO("Device name: '%s'\n", name);
+  LOG_INFO("Device node name: '%s'\n", name);
   displayPrintf(DISPLAY_ROW_CLIENTADDR,"Node: %s",name);
 
 
@@ -539,7 +545,7 @@ void set_device_name(bd_addr *pAddr)
   res = gecko_cmd_gatt_server_write_attribute_value(gattdb_device_name, 0, strlen(name), (uint8 *)name)->result;
   if (res)
   {
-	  LOG_INFO("gecko_cmd_gatt_server_write_attribute_value() failed, code %x\n", res);
+	  LOG_ERROR("gecko_cmd_gatt_server_write_attribute_value() failed, code %x\n", res);
   }
 }
 
@@ -558,12 +564,18 @@ void friend_node_init()
 	Response = gecko_cmd_mesh_friend_init()->result;
 	if (Response)
 	{
-		LOG_INFO("Friend init failed 0x%x\n", Response);
+		LOG_ERROR("Friend init failed 0x%x\n", Response);
 	}
 }
 
 
-
+/******************************************************
+ * Func name:   ps_save_data
+ * Description: save data to Flash
+ * parameter : key     - unique key to store
+ *             *pvalue - address of the value to be stored
+ *             size    - size of the variable to be stored
+ * ***************************************************/
 uint16_t ps_save_data(uint16_t key, void *pValue, uint8_t size)
 {
 	struct gecko_msg_flash_ps_save_rsp_t *pResp;
@@ -573,6 +585,13 @@ uint16_t ps_save_data(uint16_t key, void *pValue, uint8_t size)
 	return(pResp->result);
 }
 
+/******************************************************
+ * Func name:   ps_load_data
+ * Description: load data from Flash
+ * parameter : key     - unique key to store
+ *             *pvalue - address of the value to be stored
+ *             size    - size of the variable to be stored
+ * ***************************************************/
 uint16_t ps_load_data(uint16_t key, void *pValue, uint8_t size)
 {
 	struct gecko_msg_flash_ps_load_rsp_t *pResp;

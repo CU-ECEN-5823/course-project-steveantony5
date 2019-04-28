@@ -54,29 +54,30 @@
 /**********************************************
  *                MACROS
  * ********************************************/
-#define MESH               (1)
+//set as 1 when it has to function as friend node
+#define MESH                   (1)
+
+//For soft timer
 #define TIMER_ID_RESTART       (78)
 #define TIMER_ID_FACTORY_RESET (77)
-#define TIMER_ID_PROVISIONING  (66)
 #define ONE_SHOT                (1)
 #define ENABLE_TOUCH_1        (100)
 #define ENABLE_TOUCH_2        (101)
-#define TIMER_ID_RETRANS      (99)
 
-#define NONE                  (102)
-#define DELAY                 (108)
 
-#define FALL_DETECTION_NODE                    (0x1)
-#define HEART_BEAT_NODE                        (0x3)
-#define PEOPLE_COUNT_NODE                      (0x6)
+/*Node Address of Lower power nodes*/
+#define FALL_DETECTION_NODE                    (0x6)
+#define HEART_BEAT_NODE                        (0x1)
+#define PEOPLE_COUNT_NODE                      (0x2)
 
-#define HEARTBEAT_NORMAL_VALUE_MAX             (2000)
-#define HEARTBEAT_NORMAL_VALUE_MIN             (1100)
+/*Threshold for maximum people count*/
 #define PEOPLE_COUNT_MAX                       (5)
 
+/*Unique id to detect if it is tap signal or fall signal from LPN*/
 #define FALL_DETECTED                          (40)
 #define TAP_DETECTED                           (41)
 
+/*Unique key for Persistant storage of doctor count*/
 #define DOCTOR_COUNT_PS_ID                     (0x4000)
 /**********************************************
  *                GLOBALS
@@ -94,6 +95,11 @@ extern int32_t FREQUENCY_OSC;
 
 extern void button_init(void);
 
+// bluetooth stack configuration
+extern const struct bg_gattdb_def bg_gattdb_data;
+
+extern bool FLAG_STOP_LOCAL_BUFFER;
+extern bool FLAG_STOP_DEFRIBRILLATION;
 
 // bluetooth stack heap
 #define MAX_CONNECTIONS 5
@@ -112,11 +118,7 @@ extern void button_init(void);
 #define MAX_ADVERTISERS (4 + MESH_CFG_MAX_NETKEYS)
 
 
-// bluetooth stack configuration
-extern const struct bg_gattdb_def bg_gattdb_data;
 
-extern int32_t FLAG_STOP_LOCAL_BUFFER;
-extern int32_t FLAG_STOP_DEFRIBRILLATION;
 /*
 --------------------------------------------------------------------------------------------
 trigger_alarm

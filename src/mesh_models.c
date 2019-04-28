@@ -18,15 +18,14 @@ uint16_t Element_Index = 0, Appkey_Index;
 /*****************************************************************
  *              			Macros
  *****************************************************************/
-#define Generic_Level_State_Type				2
+#define Generic_Level_State_Type		(2)
 
 
 /*****************************************************************
- *            Function to subscribe
+ *            Function to subscribe using level model
  *****************************************************************/
 void generic_level_client_get(uint16_t lpn_addr)
 {
-	//LOG_INFO("Getting level publish data from LPN addr %x\n",lpn_addr);
 
 	Response = mesh_lib_generic_client_get(
 				MESH_GENERIC_LEVEL_CLIENT_MODEL_ID,
@@ -44,7 +43,9 @@ void generic_level_client_get(uint16_t lpn_addr)
 
 }
 
-
+/*****************************************************************
+ *            Function to subscribe using on-off model
+ *****************************************************************/
 void generic_onoff_client_set(uint16_t lpn_addr,bool data)
 {
 	//unicast to FALL_DETECTION_NODE

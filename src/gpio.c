@@ -10,22 +10,16 @@
  ***********************************/
 #include "gpio.h"
 
+typedef enum  {TRUE = 1, FALSE = 0, ERROR = 2}Flag_status;
+
 /**********************************
  *    Global
  ***********************************/
-int32_t FLAG_STOP_LOCAL_BUFFER = 0;
-int32_t FLAG_STOP_DEFRIBRILLATION = 0;
+/*to stop local buzzer on FALL DETECTION NODE*/
+bool FLAG_STOP_LOCAL_BUFFER = FALSE;
 
-/******************************************************
- * Func name:   gpioInit
- * Description: function initiate led pins
- * parameter : none
- * ***************************************************/
-void gpioInit()
-{
-	GPIO_DriveStrengthSet(LED1_port, gpioDriveStrengthStrongAlternateStrong);
-	GPIO_PinModeSet(LED1_port, LED1_pin, gpioModePushPull, false);
-}
+/*to stop defribrillator on HEART BEAT NODE*/
+bool FLAG_STOP_DEFRIBRILLATION = FALSE;
 
 /******************************************************
  * Func name:   button_init
@@ -48,26 +42,6 @@ void touch_sensor_init(void)
 {
 	GPIO_PinModeSet(Touch_sensor_1_port, Touch_1_pin, gpioModeInput, 0);
 	GPIO_PinModeSet(Touch_sensor_2_port, Touch_2_pin, gpioModeInput, 0);
-}
-
-/*****************************************************************
- * Function name: gpioLed1SetOn
- * Parameters : None
- *Description : For turning on LED1
- *****************************************************************/
-void gpioLed1SetOn()
-{
-	GPIO_PinOutSet(LED1_port,LED1_pin);
-}
-
-/*****************************************************************
- * Function name: gpioLed1SetOff
- * Parameters : None
- *Description : For turning off LED1
- *****************************************************************/
-void gpioLed1SetOff()
-{
-	GPIO_PinOutClear(LED1_port,LED1_pin);
 }
 
 /*****************************************************************
@@ -97,13 +71,11 @@ void gpioEnableDisplay()
 	GPIO_PinOutSet(DISPAY_PORT,DISPLAY_PIN);
 }
 
-
 /******************************************************
  * Func name:   enable_touch_interrupt
  * Description: function enable touch sensors interrupts
  * parameter : none
  * ***************************************************/
-
 void enable_touch_interrupt()
 {
 	//enables the odd and even interrupts
@@ -130,50 +102,37 @@ void enable_button_interrupt()
  *
  * Interrupt handler for even pins
  *****************************************************************/
-
 void GPIO_EVEN_IRQHandler()
 {
 	//disabling interrupts
 	CORE_ATOMIC_IRQ_DISABLE();
 
-	//LOG_INFO("Even int \n");
 	//gets the status of the interrupt
 	int Status_register = GPIO_IntGet();
-	//LOG_INFO("Status_register %d\n",Status_register);
 
-	//for touch sensor
+	//Check if the interrupt occurred due to Touch sensor
 		if(Status_register == TOUCH_1_interrupt)
 		{
 
 			int touch_1 =  !(GPIO_PinInGet(Touch_sensor_1_port, Touch_1_pin));
 
-			//LOG_INFO("Event occurred touch 1\n");
-
-			if (touch_1 == 0)
-				touch_1_status = 2; //2  - 0b10
-
-
-
+			if (touch_1 == CLEAR)
+				touch_1_status = PRESSED; //2  - 0b10
 
 			//signaling the state machine that a change has occurred
 			gecko_external_signal(touch_1_status);
 		}
 
-		//for PB1
+		//Check if the interrupt occurred due to button PB0
 		if(Status_register == PB0_interrupt)
 		{
 
-			FLAG_STOP_DEFRIBRILLATION = 1;
-
-
+			FLAG_STOP_DEFRIBRILLATION = TRUE;
 
 			//signaling the state machine that a change has occurred
 			gecko_external_signal(FLAG_STOP_DEFRIBRILLATION);
 
 		}
-
-
-
 
 	//clearing the interrupt status register
 	GPIO_IntClear(Status_register);
@@ -181,12 +140,7 @@ void GPIO_EVEN_IRQHandler()
 	//enabling interrupts
 	CORE_ATOMIC_IRQ_ENABLE();
 
-
-
-
 }
-
-
 /*****************************************************************
  * Function name: GPIO_ODD_IRQHandler
  * Parameters : None
@@ -201,34 +155,25 @@ void GPIO_ODD_IRQHandler()
 	//gets the status of the interrupt
 	int Status_register = GPIO_IntGet();
 
-	//LOG_INFO("Status_register %d\n",Status_register);
-
-	//for touch sensor
+	//Check if the interrupt occurred due to Touch sensor
 	if(Status_register == TOUCH_2_interrupt)
 	{
 
 		//reads the state of PB0 pin whether it is 0 or 1
 		int touch_2 =  !(GPIO_PinInGet(Touch_sensor_2_port, Touch_2_pin));
 
-		//LOG_INFO("Event occurred touch 2 %d\n",touch_2);
-
-		if (touch_2 == 0)
-			touch_2_status = 2; //2  - 0b10
-
-
-
+		if (touch_2 == CLEAR)
+			touch_2_status = PRESSED;
 
 		//signaling the state machine that a change has occurred
 		gecko_external_signal(touch_2_status);
 	}
 
-	//for PB1
+	//Check if the interrupt occurred due to button PB1
 	if(Status_register == PB1_interrupt)
 		{
 
-			FLAG_STOP_LOCAL_BUFFER = 1;
-
-
+			FLAG_STOP_LOCAL_BUFFER = TRUE;
 
 			//signaling the state machine that a change has occurred
 			gecko_external_signal(FLAG_STOP_LOCAL_BUFFER);
@@ -251,7 +196,6 @@ void GPIO_ODD_IRQHandler()
  * ***************************************************/
 void initiate_alarm()
 {
-	GPIO_PinOutSet(Alarm_port,Alarm_pin);
 	GPIO_DriveStrengthSet(Alarm_port, gpioDriveStrengthStrongAlternateStrong);
 	GPIO_PinModeSet(Alarm_port, Alarm_pin, gpioModePushPull, 0);
 }
@@ -263,7 +207,7 @@ void initiate_alarm()
  * ***************************************************/
 void trigger_alarm_on()
 {
-	alarm_on = 1;
+	alarm_on = TRUE;
 	ps_save_data(ALARM_STATE_PS_ID, &alarm_on, sizeof(alarm_on));
 	GPIO_PinOutSet(Alarm_port,Alarm_pin);
 
@@ -276,7 +220,7 @@ void trigger_alarm_on()
  * ***************************************************/
 void trigger_alarm_off()
 {
-	alarm_on = 0;
+	alarm_on = FALSE;
 	ps_save_data(ALARM_STATE_PS_ID, &alarm_on, sizeof(alarm_on));
 	GPIO_PinOutClear(Alarm_port,Alarm_pin);
 

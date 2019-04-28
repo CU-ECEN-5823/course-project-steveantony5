@@ -23,37 +23,35 @@
 /*****************************************************************
  *              			MACROS
  *****************************************************************/
-#define LED1_port (gpioPortF)
-#define PB0_port (gpioPortF)
-#define PB1_port (gpioPortF)
-
-#define Touch_sensor_1_port (gpioPortF)
-#define Touch_sensor_2_port (gpioPortF)
-#define Alarm_port (gpioPortC)
-#define Alarm_pin (9)
-#define ALARM_STATE_PS_ID                      (0x4100)
+#define PB0_port              (gpioPortF)
+#define PB1_port              (gpioPortF)
+#define DISPAY_PORT           (gpioPortD)
+#define Touch_sensor_1_port   (gpioPortF)
+#define Touch_sensor_2_port   (gpioPortF)
+#define Alarm_port            (gpioPortC)
 
 
-#define DISPAY_PORT (gpioPortD)
-#define LED1_pin  (5)
-#define PB0_pin (6)
-#define PB1_pin (7)
-#define Touch_1_pin (4)
-#define Touch_2_pin (5)
+#define Alarm_pin             (9)
+#define PB0_pin               (6)
+#define PB1_pin               (7)
+#define Touch_1_pin           (4)
+#define Touch_2_pin           (5)
+#define DISPLAY_PIN           (15)
 
-#define DISPLAY_PIN (15)
+
+#define ALARM_STATE_PS_ID                       (0x4100)
 #define GPIO_SET_DISPLAY_EXT_COMIN_IMPLEMENTED 	(1)
 #define GPIO_DISPLAY_SUPPORT_IMPLEMENTED		(1)
-#define EXTCOMIN_PIN (13)
-#define RISING_EDGE (1)
-#define FALLING_EDGE (1)
-
-#define TOUCH_2_interrupt (32)
-#define PB1_interrupt (128)
+#define EXTCOMIN_PIN                            (13)
+#define RISING_EDGE                             (1)
+#define FALLING_EDGE                            (1)
 
 
-#define TOUCH_1_interrupt (16)
-#define PB0_interrupt (64)
+//Interrupt status pin set
+#define TOUCH_2_interrupt     (32)
+#define PB1_interrupt         (128)
+#define TOUCH_1_interrupt     (16)
+#define PB0_interrupt         (64)
 /*****************************************************************
  *              			GLOBAL DECLARATIONS
  *****************************************************************/
@@ -63,8 +61,7 @@ button_flag  button_position ;
 button_flag touch_1_status;
 button_flag touch_2_status;
 
-extern int8_t alarm_on;
-
+extern bool alarm_on;
 /*****************************************************************
  *              			FUNCTION PROTYPES
  *****************************************************************/
