@@ -27,11 +27,8 @@ Group Report:  https://drive.google.com/drive/u/1/folders/19hdArP41vl--8bYrzDXRa
    - Stops the buzzer ringing on Friend node
 5) Tracks a count of the number of available doctors with the help of touch sensors
 
-
-# Main tasks to be done this week
-1) Try using two models in the friend node
-2) OOB authentication
-3) Two way Communication with two other LPN other than Fall Detection LPN
-
-
+# Project update - April 28, 2019
+1) Added persistent data functionality
+2) Tested complete functionality of the mesh with the friend node and three low power nodes
+3) Verification and Validation passed
 
